@@ -100,8 +100,7 @@ export const resumeUploadUrl = handler(async (e) => {
       Bucket: process.env.DOCUMENTS_BUCKET,
       Key: key,
       ContentType: "application/pdf",
-      ServerSideEncryption: "aws:kms",
-      SSEKMSKeyId: process.env.KMS_KEY_ARN,
+      // Encryption comes from the bucket's default KMS key, so the app doesn't need to send key headers.
     }),
     { expiresIn: 300 },
   );
@@ -157,7 +156,7 @@ export const payoutsLink = handler(async (e) => {
       }),
     );
   }
-  const base = process.env.APP_URL ?? "https://ihealthe.com";
+  const base = process.env.APP_URL ?? "https://ihealthe.net";
   const url = await onboardingLink(accountId, `${base}/pro/payouts/done`, `${base}/pro/payouts/retry`);
   return json(200, { url });
 });

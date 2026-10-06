@@ -11,3 +11,7 @@ coverage/
 *.pem
 *.key
 data/
+.expo/
+expo-env.d.ts
+ios/
+android/

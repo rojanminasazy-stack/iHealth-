@@ -22,7 +22,9 @@ Payments run on **Stripe Connect**. The patient pays once; Stripe routes the vis
 backend/   Business logic + AWS Lambda handlers (TypeScript)
 infra/     AWS infrastructure as code (CDK)
 docs/      Architecture, HIPAA program checklist, fee model
-apps/      (next) Patient app + Physician app — React Native / Expo
+apps/patient    iHealthé — patient app (iOS + Android, Expo)
+apps/physician  iHealthé Pro — physician app (iOS + Android, Expo)
+apps/shared     Sign-in, API client, brand and UI shared by both apps
 ```
 
 ## Stack (all HIPAA-eligible under the AWS BAA)
@@ -47,5 +49,16 @@ npm test          # unit tests for eligibility, matching, fees, onboarding
 npm run typecheck
 npm run synth     # renders the AWS CloudFormation template (no deploy)
 ```
+
+### Running the apps
+
+1. Deploy the backend (`cd infra && npx cdk deploy`) and note the outputs.
+2. Copy `apps/patient/.env.example` to `apps/patient/.env` and `apps/physician/.env.example` to `apps/physician/.env`, then fill in the values.
+3. The apps use native modules (Stripe, secure storage), so run them as development builds, not Expo Go:
+   ```bash
+   cd apps/patient && npx expo run:ios      # or run:android
+   cd apps/physician && npx expo run:ios
+   ```
+4. For the App Store and Google Play, build with EAS: `npx eas build --platform all`.
 
 Use fake data only in development. Never copy real patient data to a laptop.
