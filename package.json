@@ -1,0 +1,11 @@
+{
+  "name": "ihealthe",
+  "private": true,
+  "description": "iHealthé — on-demand physician marketplace. Patients choose a licensed physician in their state and connect by video.",
+  "workspaces": ["backend", "infra"],
+  "scripts": {
+    "test": "npm run test -w backend",
+    "typecheck": "npm run typecheck -w backend && npm run typecheck -w infra",
+    "synth": "npm run synth -w infra"
+  }
+}

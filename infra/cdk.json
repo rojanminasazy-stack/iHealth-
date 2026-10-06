@@ -1,0 +1,8 @@
+{
+  "app": "npx tsx bin/app.ts",
+  "context": {
+    "stage": "dev",
+    "emailFrom": "no-reply@ihealthe.com",
+    "appUrl": "https://ihealthe.com"
+  }
+}
