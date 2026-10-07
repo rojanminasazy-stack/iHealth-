@@ -18,6 +18,10 @@ export const TEMPLATES = {
     subject: "Your iHealthé visit is confirmed",
     text: "Your iHealthé visit is confirmed. Open the app to join when you're ready.",
   },
+  VISIT_READY: {
+    subject: "Your iHealthé physician is ready",
+    text: "Your physician is ready for your iHealthé video visit. Open the app to join.",
+  },
   VISIT_RECEIPT: {
     subject: "Your iHealthé receipt",
     text: "Thanks for using iHealthé. Your receipt and visit summary are in the app.",
@@ -33,6 +37,10 @@ export const TEMPLATES = {
   PROVIDER_NOT_APPROVED: {
     subject: "Update on your iHealthé application",
     text: "We weren't able to approve your iHealthé application. Reply to this email if you have questions.",
+  },
+  PROVIDER_SUBSCRIPTION_PROBLEM: {
+    subject: "Action needed on your iHealthé subscription",
+    text: "We couldn't process your iHealthé subscription payment. Update your card in iHealthé Pro to keep receiving patients.",
   },
   PROVIDER_NEW_REQUEST: {
     subject: "New iHealthé patient request",

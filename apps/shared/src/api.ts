@@ -36,12 +36,31 @@ export interface CreatedRequest {
   physician: Omit<PhysicianCard, "quote">;
 }
 
+/** Chime SDK join payload, passed straight to the visit page. */
+export interface JoinInfo {
+  meeting: unknown;
+  attendee: unknown;
+}
+
+export interface PhysicianVisit {
+  requestId: string;
+  status: "MATCHED" | "IN_VISIT";
+  ageGroup: "ADULT" | "CHILD";
+  specialty: string;
+  patientState: string;
+  chiefComplaint: string;
+  symptomDuration: string;
+  createdAt: string;
+}
+
 export interface RequestStatus {
   requestId: string;
   status: "REQUESTED" | "OFFERED" | "MATCHED" | "IN_VISIT" | "COMPLETED" | "CANCELLED" | "EXPIRED" | "PROVIDER_CANCELLED";
   visitPriceCents: number;
   bookingFeeCents: number;
   physician: Omit<PhysicianCard, "quote"> | null;
+  patientSummary: string | null;
+  completedAt: string | null;
 }
 
 export interface PhysicianSelf {
@@ -55,6 +74,9 @@ export interface PhysicianSelf {
   licenses: { state: string; number: string; expiresOn: string; verified: boolean }[];
   baaSigned: boolean;
   payoutsReady: boolean;
+  subscriptionStatus: string | null;
+  subscriptionReady: boolean;
+  plan: { priceCents: number; trialDays: number; label: string };
   resumeUploaded: boolean;
   founding: boolean;
   nextSteps: string[];
@@ -106,6 +128,7 @@ export function createApi(baseUrl: string, auth: Auth) {
       }) => call<CreatedRequest>("POST", "/patient/requests", b),
       request: (id: string) => call<RequestStatus>("GET", `/patient/requests/${encodeURIComponent(id)}`),
       cancel: (id: string) => call<{ status: string }>("POST", `/patient/requests/${encodeURIComponent(id)}/cancel`),
+      join: (id: string) => call<JoinInfo>("POST", `/patient/requests/${encodeURIComponent(id)}/join`),
     },
     physician: {
       me: () => call<PhysicianSelf>("GET", "/physician/me"),
@@ -125,6 +148,11 @@ export function createApi(baseUrl: string, auth: Auth) {
       setPrice: (visitPriceCents: number) => call<{ visitPriceCents: number; bookingFeeCents: number }>("PUT", "/physician/price", { visitPriceCents }),
       setOnline: (online: boolean) => call<{ online: boolean }>("POST", "/physician/online", { online }),
       openRequests: () => call<{ requests: OpenRequest[] }>("GET", "/physician/requests"),
+      subscription: () => call<{ url: string }>("POST", "/physician/subscription"),
+      visits: () => call<{ visits: PhysicianVisit[] }>("GET", "/physician/visits"),
+      join: (id: string) => call<JoinInfo>("POST", `/physician/visits/${encodeURIComponent(id)}/join`),
+      complete: (id: string, patientSummary: string) =>
+        call<{ requestId: string; status: string }>("POST", `/physician/visits/${encodeURIComponent(id)}/complete`, { patientSummary }),
       accept: (id: string) => call<{ requestId: string; status: string }>("POST", `/physician/requests/${encodeURIComponent(id)}/accept`),
     },
   };

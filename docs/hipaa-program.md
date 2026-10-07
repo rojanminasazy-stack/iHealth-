@@ -41,5 +41,6 @@ iHealthé is a **business associate** of every physician on the platform. Softwa
 |---|---|---|
 | AWS (Cognito, Lambda, DynamoDB, S3, SES, SMS, Chime, KMS) | Yes | AWS BAA |
 | Stripe | No (by design) | Not required if no PHI sent |
+| Amazon Chime SDK (video) | Yes (live audio/video, not recorded) | AWS BAA |
 | GitHub | No (code only, never data) | Not required |
 | Apple / Google push | No (generic text only) | Not required |

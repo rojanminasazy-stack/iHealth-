@@ -21,8 +21,8 @@ describe("state machines", () => {
   });
 
   it("lists what blocks activation", () => {
-    const p = provider({ status: "APPROVED", baaSignedAt: undefined, stripeChargesEnabled: false });
-    expect(activationBlockers(p)).toEqual(["Business Associate Agreement not signed", "Payout account not set up"]);
+    const p = provider({ status: "APPROVED", baaSignedAt: undefined, stripeChargesEnabled: false, subscriptionStatus: undefined });
+    expect(activationBlockers(p)).toEqual(["Business Associate Agreement not signed", "Payout account not set up", "Subscription not started"]);
     expect(activationBlockers(provider({ status: "APPROVED" }))).toEqual([]);
   });
 });

@@ -19,6 +19,7 @@ export function provider(over: Partial<Provider> = {}): Provider {
     stripeAccountId: "acct_test",
     stripeChargesEnabled: true,
     founding: true,
+    subscriptionStatus: "trialing",
     contact: { email: "jane@example.com" },
     createdAt: "2026-10-01T00:00:00Z",
     updatedAt: "2026-10-01T00:00:00Z",

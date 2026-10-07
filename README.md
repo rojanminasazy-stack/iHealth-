@@ -24,7 +24,8 @@ infra/     AWS infrastructure as code (CDK)
 docs/      Architecture, HIPAA program checklist, fee model
 apps/patient    iHealthé — patient app (iOS + Android, Expo)
 apps/physician  iHealthé Pro — physician app (iOS + Android, Expo)
-apps/shared     Sign-in, API client, brand and UI shared by both apps
+apps/shared     Sign-in, API client, video, brand and UI shared by both apps
+website/        ihealthe.net: landing pages, video visit page, staff credentialing portal
 ```
 
 ## Stack (all HIPAA-eligible under the AWS BAA)
@@ -34,8 +35,12 @@ apps/shared     Sign-in, API client, brand and UI shared by both apps
 - Database: DynamoDB, encrypted with a customer-managed KMS key
 - Files (resumes, license documents): S3, encrypted, private, versioned
 - Email: Amazon SES · Text messages: AWS End User Messaging SMS
-- Video: Amazon Chime SDK (not recorded)
+- Video: Amazon Chime SDK (not recorded), shown in the apps through the ihealthe.net visit page
 - Audit: CloudTrail + an append-only application audit table
+
+## Going live
+
+Step-by-step AWS, domain and Stripe setup: [docs/launch-setup.md](docs/launch-setup.md).
 
 ## Before any real patient uses this
 

@@ -6,6 +6,7 @@ import { getProvider, providersByStatus, publicProfile } from "../lib/providers.
 import { authorizeVisit, releaseVisit } from "../lib/payments.js";
 import { findEligible, isEligible } from "../domain/eligibility.js";
 import { assertRequestTransition } from "../domain/stateMachines.js";
+import { patientVisitView } from "./visit.js";
 import { quote } from "../domain/fees.js";
 import * as v from "../domain/validation.js";
 import type { CareRequest } from "../domain/types.js";
@@ -103,15 +104,7 @@ async function ownRequest(e: Event, userId: string): Promise<CareRequest> {
 export const getRequest = handler(async (e) => {
   const c = caller(e, "PATIENT");
   const r = await ownRequest(e, c.userId);
-  const p = r.matchedProviderId ? await getProvider(r.matchedProviderId) : undefined;
-  return json(200, {
-    requestId: r.requestId,
-    status: r.status,
-    visitPriceCents: r.visitPriceCents,
-    bookingFeeCents: r.bookingFeeCents,
-    physician: p ? publicProfile(p) : null,
-    updatedAt: r.updatedAt,
-  });
+  return json(200, await patientVisitView(r));
 });
 
 /** POST /patient/requests/{id}/cancel — releases the card hold. */
@@ -123,7 +116,7 @@ export const cancelRequest = handler(async (e) => {
     new UpdateCommand({
       TableName: tables.requests,
       Key: { requestId: r.requestId },
-      UpdateExpression: "SET #s = :c, updatedAt = :at REMOVE openState",
+      UpdateExpression: "SET #s = :c, updatedAt = :at REMOVE openState, activeProviderId",
       ConditionExpression: "#s = :from",
       ExpressionAttributeNames: { "#s": "status" },
       ExpressionAttributeValues: { ":c": "CANCELLED", ":from": r.status, ":at": nowIso() },

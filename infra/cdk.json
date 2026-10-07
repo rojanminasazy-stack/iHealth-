@@ -2,6 +2,7 @@
   "app": "npx tsx bin/app.ts",
   "context": {
     "stage": "dev",
+    "domain": "ihealthe.net",
     "emailFrom": "no-reply@ihealthe.net",
     "appUrl": "https://ihealthe.net"
   }

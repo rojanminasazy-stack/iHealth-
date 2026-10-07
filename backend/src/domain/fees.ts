@@ -66,3 +66,10 @@ export function subscriptionPlanFor(foundingSeatsUsed: number): SubscriptionPlan
   }
   return { priceCents: FEES.subscriptionStandardCents, trialDays: 0, label: "Standard" };
 }
+
+export const FOUNDING_PLAN: SubscriptionPlan = {
+  priceCents: FEES.subscriptionFoundingCents,
+  trialDays: FEES.foundingTrialDays,
+  label: "Founding Physician",
+};
+export const STANDARD_PLAN: SubscriptionPlan = { priceCents: FEES.subscriptionStandardCents, trialDays: 0, label: "Standard" };

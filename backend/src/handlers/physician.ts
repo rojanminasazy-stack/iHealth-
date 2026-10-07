@@ -6,9 +6,10 @@ import { ddb, newId, nowIso, tables, todayIso } from "../lib/db.js";
 import { audit } from "../lib/audit.js";
 import { notify } from "../lib/notify.js";
 import { requireProviderForUser, providerForUser, tryActivate } from "../lib/providers.js";
-import { createPhysicianAccount, onboardingLink } from "../lib/payments.js";
+import { billingPortal, createPhysicianAccount, onboardingLink, subscriptionCheckout } from "../lib/payments.js";
 import * as v from "../domain/validation.js";
-import { validateVisitPrice, FEES } from "../domain/fees.js";
+import { validateVisitPrice, FEES, FOUNDING_PLAN, STANDARD_PLAN } from "../domain/fees.js";
+import { subscriptionOk } from "../domain/eligibility.js";
 import { activationBlockers } from "../domain/stateMachines.js";
 import { isEligible } from "../domain/eligibility.js";
 import type { CareRequest, Provider } from "../domain/types.js";
@@ -33,6 +34,9 @@ function selfView(p: Provider) {
     licenses: p.licenses.map((l) => ({ state: l.state, number: l.number, expiresOn: l.expiresOn, verified: !!l.verifiedAt })),
     baaSigned: !!p.baaSignedAt,
     payoutsReady: p.stripeChargesEnabled,
+    subscriptionStatus: p.subscriptionStatus ?? null,
+    subscriptionReady: subscriptionOk(p.subscriptionStatus),
+    plan: p.founding ? FOUNDING_PLAN : STANDARD_PLAN,
     resumeUploaded: !!p.resumeKey,
     founding: p.founding,
     nextSteps: p.status === "APPROVED" ? activationBlockers(p) : [],
@@ -260,7 +264,7 @@ export const accept = handler(async (e) => {
       new UpdateCommand({
         TableName: tables.requests,
         Key: { requestId },
-        UpdateExpression: "SET #s = :matched, matchedProviderId = :p, updatedAt = :at REMOVE openState",
+        UpdateExpression: "SET #s = :matched, matchedProviderId = :p, activeProviderId = :p, updatedAt = :at REMOVE openState",
         // Only a paid-for, still-open request can be accepted.
         ConditionExpression: "#s = :offered AND attribute_exists(openState)",
         ExpressionAttributeNames: { "#s": "status" },
@@ -276,4 +280,37 @@ export const accept = handler(async (e) => {
   await audit({ actorId: c.userId, actorRole: "PHYSICIAN", action: "CARE_REQUEST_ACCEPTED", resourceType: "CARE_REQUEST", resourceId: requestId, result: "ALLOWED" });
   await notify(r.patientContact, "VISIT_CONFIRMED");
   return json(200, { requestId, status: "MATCHED" });
+});
+
+/** POST /physician/subscription — Stripe Checkout for the monthly iHealthé Pro subscription. */
+export const subscription = handler(async (e) => {
+  const c = caller(e, "PHYSICIAN");
+  const p = await requireProviderForUser(c.userId);
+  if (p.status !== "APPROVED" && p.status !== "ACTIVE") throw new HttpError(409, "Your subscription starts after your application is approved.");
+  const base = process.env.APP_URL ?? "https://ihealthe.net";
+  if (p.stripeCustomerId && p.subscriptionStatus && p.subscriptionStatus !== "canceled" && p.subscriptionStatus !== "incomplete_expired") {
+    return json(200, { url: await billingPortal(p.stripeCustomerId, `${base}/pro/subscription/done`) });
+  }
+  const plan = p.founding ? FOUNDING_PLAN : STANDARD_PLAN;
+  const { url, customerId } = await subscriptionCheckout({
+    providerId: p.providerId,
+    email: p.contact.email,
+    customerId: p.stripeCustomerId,
+    priceCents: plan.priceCents,
+    trialDays: plan.trialDays,
+    planLabel: plan.label,
+    successUrl: `${base}/pro/subscription/done`,
+    cancelUrl: `${base}/pro/subscription/retry`,
+  });
+  if (!p.stripeCustomerId) {
+    await ddb.send(
+      new UpdateCommand({
+        TableName: tables.providers,
+        Key: { providerId: p.providerId },
+        UpdateExpression: "SET stripeCustomerId = :c, updatedAt = :at",
+        ExpressionAttributeValues: { ":c": customerId, ":at": nowIso() },
+      }),
+    );
+  }
+  return json(200, { url });
 });

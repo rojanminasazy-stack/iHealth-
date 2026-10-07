@@ -13,11 +13,17 @@ export type IneligibleReason =
   | "OFFLINE"
   | "NO_BAA"
   | "PAYMENTS_NOT_READY"
+  | "SUBSCRIPTION_INACTIVE"
   | "NO_LICENSE_IN_STATE"
   | "LICENSE_NOT_VERIFIED"
   | "LICENSE_EXPIRED"
   | "WRONG_SPECIALTY"
   | "NO_PEDIATRICS";
+
+/** Trialing (founding 90 days) and active subscriptions may see patients. past_due gets Stripe's retry window. */
+export function subscriptionOk(status: string | undefined): boolean {
+  return status === "trialing" || status === "active" || status === "past_due";
+}
 
 /**
  * Hard rules. Any failure means the physician may not see or accept this patient.
@@ -29,6 +35,7 @@ export function checkEligibility(p: Provider, q: EligibilityQuery): IneligibleRe
   if (!p.online) reasons.push("OFFLINE");
   if (!p.baaSignedAt) reasons.push("NO_BAA");
   if (!p.stripeAccountId || !p.stripeChargesEnabled) reasons.push("PAYMENTS_NOT_READY");
+  if (!subscriptionOk(p.subscriptionStatus)) reasons.push("SUBSCRIPTION_INACTIVE");
 
   const lic = p.licenses.find((l) => l.state === q.patientState);
   if (!lic) reasons.push("NO_LICENSE_IN_STATE");

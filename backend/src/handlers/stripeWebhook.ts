@@ -11,6 +11,7 @@ import type { CareRequest, Provider } from "../domain/types.js";
  * POST /webhooks/stripe — public route, trusted only after signature verification.
  *  - account.updated: physician finished payout setup → may activate.
  *  - payment_intent.amount_capturable_updated: patient's card hold succeeded → offer to physician.
+ *  - customer.subscription.*: physician subscription status → may activate, or stops new patients if canceled.
  */
 export const main = async (e: APIGatewayProxyEventV2): Promise<APIGatewayProxyResultV2> => {
   const sig = e.headers["stripe-signature"];
@@ -18,7 +19,7 @@ export const main = async (e: APIGatewayProxyEventV2): Promise<APIGatewayProxyRe
   const raw = e.isBase64Encoded ? Buffer.from(e.body, "base64").toString("utf8") : e.body;
   let evt;
   try {
-    evt = verifyWebhook(raw, sig);
+    evt = await verifyWebhook(raw, sig);
   } catch {
     return { statusCode: 400 };
   }
@@ -75,6 +76,30 @@ export const main = async (e: APIGatewayProxyEventV2): Promise<APIGatewayProxyRe
         const p = await getProvider(req.requestedProviderId);
         if (p) await notify(p.contact, "PROVIDER_NEW_REQUEST");
       }
+    }
+  }
+
+  if (
+    evt.type === "customer.subscription.created" ||
+    evt.type === "customer.subscription.updated" ||
+    evt.type === "customer.subscription.deleted"
+  ) {
+    const sub = evt.data.object;
+    const providerId = sub.metadata?.provider_id;
+    const p = providerId ? await getProvider(providerId) : undefined;
+    if (p) {
+      const status = evt.type === "customer.subscription.deleted" ? "canceled" : sub.status;
+      await ddb.send(
+        new UpdateCommand({
+          TableName: tables.providers,
+          Key: { providerId: p.providerId },
+          UpdateExpression: "SET subscriptionStatus = :s, updatedAt = :at",
+          ExpressionAttributeValues: { ":s": status, ":at": nowIso() },
+        }),
+      );
+      await audit({ actorId: "stripe", actorRole: "SYSTEM", action: "SUBSCRIPTION_UPDATED", resourceType: "PROVIDER", resourceId: p.providerId, result: "ALLOWED", reason: status });
+      if (status === "past_due" && p.subscriptionStatus !== "past_due") await notify(p.contact, "PROVIDER_SUBSCRIPTION_PROBLEM");
+      await tryActivate({ ...p, subscriptionStatus: status });
     }
   }
 

@@ -43,6 +43,7 @@ export default function RootLayout() {
         <Stack.Screen name="index" options={{ title: "iHealthé Pro" }} />
         <Stack.Screen name="apply" options={{ title: "Apply" }} />
         <Stack.Screen name="baa" options={{ title: "Business Associate Agreement" }} />
+        <Stack.Screen name="visit/[id]" options={{ headerShown: false, gestureEnabled: false }} />
         <Stack.Screen name="account" options={{ title: "Account" }} />
       </Stack>
     </>

@@ -31,6 +31,12 @@ describe("eligibility", () => {
     expect(r).toEqual(expect.arrayContaining(["NO_BAA", "PAYMENTS_NOT_READY", "NOT_ACTIVE", "OFFLINE"]));
   });
 
+  it("blocks physicians without a trialing, active or past-due subscription", () => {
+    expect(checkEligibility(provider({ subscriptionStatus: "canceled" }), CA_ADULT)).toContain("SUBSCRIPTION_INACTIVE");
+    expect(checkEligibility(provider({ subscriptionStatus: undefined }), CA_ADULT)).toContain("SUBSCRIPTION_INACTIVE");
+    expect(checkEligibility(provider({ subscriptionStatus: "active" }), CA_ADULT)).toEqual([]);
+  });
+
   it("blocks child patients for physicians who don't see children", () => {
     expect(checkEligibility(provider(), { ...CA_ADULT, ageGroup: "CHILD" })).toContain("NO_PEDIATRICS");
     expect(checkEligibility(provider({ acceptsPediatric: true }), { ...CA_ADULT, ageGroup: "CHILD" })).toEqual([]);

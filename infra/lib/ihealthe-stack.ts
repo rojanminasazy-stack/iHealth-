@@ -15,14 +15,25 @@ import * as authorizers from "aws-cdk-lib/aws-apigatewayv2-authorizers";
 import * as integrations from "aws-cdk-lib/aws-apigatewayv2-integrations";
 import * as cloudtrail from "aws-cdk-lib/aws-cloudtrail";
 import * as secrets from "aws-cdk-lib/aws-secretsmanager";
+import * as route53 from "aws-cdk-lib/aws-route53";
+import * as targets from "aws-cdk-lib/aws-route53-targets";
+import type * as acm from "aws-cdk-lib/aws-certificatemanager";
+import * as cloudfront from "aws-cdk-lib/aws-cloudfront";
+import * as origins from "aws-cdk-lib/aws-cloudfront-origins";
+import * as s3deploy from "aws-cdk-lib/aws-s3-deployment";
+import * as ses from "aws-cdk-lib/aws-ses";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const HANDLERS = path.join(here, "../../backend/src/handlers");
+const SITE_DIST = path.join(here, "../../website/dist");
 
 export interface IHealtheProps extends StackProps {
   stage: string;
   emailFrom: string;
   appUrl: string;
+  domain: string;
+  zone: route53.IHostedZone;
+  certificate: acm.ICertificate;
 }
 
 /**
@@ -74,6 +85,12 @@ export class IHealtheStack extends Stack {
     requests.addGlobalSecondaryIndex({
       indexName: "openByState",
       partitionKey: { name: "openState", type: ddb.AttributeType.STRING },
+      sortKey: { name: "createdAt", type: ddb.AttributeType.STRING },
+    });
+    // Sparse index: only matched / in-visit requests carry activeProviderId.
+    requests.addGlobalSecondaryIndex({
+      indexName: "byActiveProvider",
+      partitionKey: { name: "activeProviderId", type: ddb.AttributeType.STRING },
       sortKey: { name: "createdAt", type: ddb.AttributeType.STRING },
     });
     requests.addGlobalSecondaryIndex({
@@ -171,10 +188,10 @@ export class IHealtheStack extends Stack {
       KMS_KEY_ARN: key.keyArn,
       EMAIL_FROM: props.emailFrom,
       APP_URL: props.appUrl,
-      // Filled from Secrets Manager at deploy via dynamic reference (never stored in the template in plaintext).
-      STRIPE_SECRET_KEY: stripeSecret.secretValueFromJson("secretKey").unsafeUnwrap(),
-      STRIPE_WEBHOOK_SECRET: stripeSecret.secretValueFromJson("webhookSecret").unsafeUnwrap(),
-      SMS_ORIGINATION: "", // set once a toll-free number is registered in AWS End User Messaging
+      // Lambdas read the Stripe keys from Secrets Manager at runtime; only the secret's ARN is here.
+      STRIPE_SECRET_ARN: stripeSecret.secretArn,
+      SMS_ORIGINATION: "",
+      VIDEO_MEDIA_REGION: this.region, // set once a toll-free number is registered in AWS End User Messaging
       NODE_OPTIONS: "--enable-source-maps",
     };
 
@@ -209,8 +226,15 @@ export class IHealtheStack extends Stack {
       // Audit is append-only: PutItem, nothing else.
       f.addToRolePolicy(new iam.PolicyStatement({ actions: ["dynamodb:PutItem"], resources: [auditTable.tableArn] }));
       key.grantEncryptDecrypt(f);
+      stripeSecret.grantRead(f);
       f.addToRolePolicy(new iam.PolicyStatement({ actions: ["ses:SendEmail"], resources: ["*"] }));
       f.addToRolePolicy(new iam.PolicyStatement({ actions: ["sms-voice:SendTextMessage"], resources: ["*"] }));
+      f.addToRolePolicy(
+        new iam.PolicyStatement({
+          actions: ["chime:CreateMeeting", "chime:GetMeeting", "chime:DeleteMeeting", "chime:CreateAttendee"],
+          resources: ["*"],
+        }),
+      );
       fns.push(f);
       return f;
     };
@@ -219,7 +243,7 @@ export class IHealtheStack extends Stack {
     const api = new apigw.HttpApi(this, "Api", {
       apiName: `ihealthe-${props.stage}`,
       corsPreflight: {
-        allowOrigins: [props.appUrl],
+        allowOrigins: [props.appUrl, `https://www.${props.domain}`],
         allowMethods: [apigw.CorsHttpMethod.GET, apigw.CorsHttpMethod.POST, apigw.CorsHttpMethod.PUT],
         allowHeaders: ["authorization", "content-type"],
         maxAge: Duration.hours(1),
@@ -253,6 +277,7 @@ export class IHealtheStack extends Stack {
     route(GET, "/patient/physicians", authPatient, "patient", "listPhysicians");
     route(POST, "/patient/requests", authPatient, "patient", "createRequest");
     route(GET, "/patient/requests/{id}", authPatient, "patient", "getRequest");
+    route(POST, "/patient/requests/{id}/join", authPatient, "visit", "patientJoin");
     route(POST, "/patient/requests/{id}/cancel", authPatient, "patient", "cancelRequest");
     // Physicians
     route(POST, "/physician/application", authPhysician, "physician", "apply");
@@ -264,6 +289,10 @@ export class IHealtheStack extends Stack {
     route(POST, "/physician/online", authPhysician, "physician", "setOnline");
     route(GET, "/physician/requests", authPhysician, "physician", "openRequests");
     route(POST, "/physician/requests/{id}/accept", authPhysician, "physician", "accept");
+    route(POST, "/physician/subscription", authPhysician, "physician", "subscription");
+    route(GET, "/physician/visits", authPhysician, "visit", "physicianVisits");
+    route(POST, "/physician/visits/{id}/join", authPhysician, "visit", "physicianJoin");
+    route(POST, "/physician/visits/{id}/complete", authPhysician, "visit", "complete");
     // Credentialing staff
     route(GET, "/staff/providers", authStaff, "staff", "queue");
     route(GET, "/staff/providers/{id}/resume", authStaff, "staff", "resume");
@@ -298,6 +327,86 @@ export class IHealtheStack extends Stack {
     });
     trail.addS3EventSelector([{ bucket: documents }], { readWriteType: cloudtrail.ReadWriteType.ALL });
 
+    // ── Email: verify the domain in SES with DKIM records written straight into Route 53 ──
+    new ses.EmailIdentity(this, "EmailDomain", {
+      identity: ses.Identity.publicHostedZone(props.zone),
+      mailFromDomain: `mail.${props.domain}`,
+    });
+
+    // ── Website (ihealthe.net): private S3 bucket behind CloudFront, HTTPS only, strict security headers ──
+    const siteBucket = new s3.Bucket(this, "Site", {
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      encryption: s3.BucketEncryption.S3_MANAGED,
+      enforceSSL: true,
+      removalPolicy: RemovalPolicy.DESTROY,
+      autoDeleteObjects: true,
+    });
+    const apiOrigin = api.apiEndpoint;
+    const headers = new cloudfront.ResponseHeadersPolicy(this, "SiteHeaders", {
+      securityHeadersBehavior: {
+        contentSecurityPolicy: {
+          override: true,
+          contentSecurityPolicy: [
+            "default-src 'self'",
+            "script-src 'self'",
+            "style-src 'self' 'unsafe-inline'",
+            "img-src 'self' data:",
+            "media-src 'self' blob: mediastream:",
+            "worker-src 'self' blob:",
+            `connect-src 'self' ${apiOrigin} https://cognito-idp.${this.region}.amazonaws.com https://*.chime.aws wss://*.chime.aws https://*.amazonaws.com`,
+            "frame-ancestors 'none'",
+            "base-uri 'none'",
+            "form-action 'self'",
+          ].join("; "),
+        },
+        strictTransportSecurity: { override: true, accessControlMaxAge: Duration.days(730), includeSubdomains: true, preload: true },
+        contentTypeOptions: { override: true },
+        frameOptions: { override: true, frameOption: cloudfront.HeadersFrameOption.DENY },
+        referrerPolicy: { override: true, referrerPolicy: cloudfront.HeadersReferrerPolicy.NO_REFERRER },
+      },
+      customHeadersBehavior: {
+        customHeaders: [{ header: "Permissions-Policy", value: "camera=(self), microphone=(self), geolocation=()", override: true }],
+      },
+    });
+    // Pretty URLs: /physicians → /physicians.html, /staff/ → /staff/index.html
+    const rewrite = new cloudfront.Function(this, "PrettyUrls", {
+      runtime: cloudfront.FunctionRuntime.JS_2_0,
+      code: cloudfront.FunctionCode.fromInline(
+        "function handler(e){var r=e.request,u=r.uri;if(u.endsWith('/'))r.uri=u+'index.html';else if(u.lastIndexOf('.')<u.lastIndexOf('/')+1)r.uri=u+'.html';return r;}",
+      ),
+    });
+    const dist = new cloudfront.Distribution(this, "SiteCdn", {
+      defaultRootObject: "index.html",
+      domainNames: [props.domain, `www.${props.domain}`],
+      certificate: props.certificate,
+      minimumProtocolVersion: cloudfront.SecurityPolicyProtocol.TLS_V1_2_2021,
+      defaultBehavior: {
+        origin: origins.S3BucketOrigin.withOriginAccessControl(siteBucket),
+        viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+        responseHeadersPolicy: headers,
+        functionAssociations: [{ function: rewrite, eventType: cloudfront.FunctionEventType.VIEWER_REQUEST }],
+      },
+      errorResponses: [{ httpStatus: 403, responseHttpStatus: 404, responsePagePath: "/index.html", ttl: Duration.minutes(5) }],
+    });
+    new s3deploy.BucketDeployment(this, "SiteDeploy", {
+      destinationBucket: siteBucket,
+      distribution: dist,
+      sources: [
+        s3deploy.Source.asset(SITE_DIST),
+        // Public identifiers only (no secrets) for the staff portal.
+        s3deploy.Source.jsonData("config.json", {
+          apiUrl: api.apiEndpoint,
+          staffPoolId: staff.pool.userPoolId,
+          staffClientId: staff.client.userPoolClientId,
+        }),
+      ],
+    });
+    for (const name of [props.domain, `www.${props.domain}`]) {
+      const target = route53.RecordTarget.fromAlias(new targets.CloudFrontTarget(dist));
+      new route53.ARecord(this, `Site-A-${name}`, { zone: props.zone, recordName: name, target });
+      new route53.AaaaRecord(this, `Site-AAAA-${name}`, { zone: props.zone, recordName: name, target });
+    }
+
     // ── Outputs the apps need ──
     new CfnOutput(this, "ApiUrl", { value: api.apiEndpoint });
     new CfnOutput(this, "PatientPoolId", { value: patients.pool.userPoolId });
@@ -307,5 +416,7 @@ export class IHealtheStack extends Stack {
     new CfnOutput(this, "StaffPoolId", { value: staff.pool.userPoolId });
     new CfnOutput(this, "StaffClientId", { value: staff.client.userPoolClientId });
     new CfnOutput(this, "StripeSecretName", { value: stripeSecret.secretName });
+    new CfnOutput(this, "StripeWebhookUrl", { value: `${api.apiEndpoint}/webhooks/stripe` });
+    new CfnOutput(this, "SiteUrl", { value: `https://${props.domain}` });
   }
 }

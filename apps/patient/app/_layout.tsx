@@ -50,6 +50,7 @@ export default function RootLayout() {
           <Stack.Screen name="intake" options={{ title: "What's going on?" }} />
           <Stack.Screen name="choose" options={{ title: "Choose your physician" }} />
           <Stack.Screen name="request/[id]" options={{ title: "Your visit", headerBackVisible: false }} />
+          <Stack.Screen name="visit/[id]" options={{ headerShown: false, gestureEnabled: false }} />
           <Stack.Screen name="account" options={{ title: "Account" }} />
         </Stack>
       </IntakeProvider>

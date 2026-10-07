@@ -23,6 +23,7 @@ import {
   Title,
   type OpenRequest,
   type PhysicianSelf,
+  type PhysicianVisit,
 } from "@ihealthe/shared";
 import { api } from "../lib/session";
 
@@ -194,9 +195,23 @@ function NextSteps({ me, reload }: { me: PhysicianSelf; reload: () => Promise<vo
     }
   };
 
+  const plan = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const { url } = await api.physician.subscription();
+      await WebBrowser.openBrowserAsync(url);
+      await reload();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <>
-      <Notice>You're approved. Finish these two steps and you can go online.</Notice>
+      <Notice>You're approved. Finish these three steps and you can go online.</Notice>
       <Card>
         <Row style={{ justifyContent: "space-between" }}>
           <Heading>1. Sign the agreement</Heading>
@@ -213,6 +228,18 @@ function NextSteps({ me, reload }: { me: PhysicianSelf; reload: () => Promise<vo
         <Small>Patients pay you through Stripe. Stripe verifies your identity and bank account and sends your tax forms.</Small>
         {!me.payoutsReady ? <Button title="Set up with Stripe" loading={busy} onPress={payouts} /> : null}
       </Card>
+      <Card>
+        <Row style={{ justifyContent: "space-between" }}>
+          <Heading>3. Start your plan</Heading>
+          <Pill text={me.subscriptionReady ? "DONE" : "TO DO"} tone={me.subscriptionReady ? "good" : "warn"} />
+        </Row>
+        <Small>
+          {me.plan.trialDays > 0
+            ? `${me.plan.label}: free for ${me.plan.trialDays} days, then ${money(me.plan.priceCents)}/month. You won't be charged today.`
+            : `${me.plan.label}: ${money(me.plan.priceCents)}/month. Cancel any time.`}
+        </Small>
+        {!me.subscriptionReady ? <Button title="Start plan" loading={busy} onPress={plan} /> : null}
+      </Card>
       <ErrorText>{error}</ErrorText>
     </>
   );
@@ -221,11 +248,26 @@ function NextSteps({ me, reload }: { me: PhysicianSelf; reload: () => Promise<vo
 function Active({ me, reload }: { me: PhysicianSelf; reload: () => Promise<void> }) {
   const [online, setOnline] = useState(me.online);
   const [requests, setRequests] = useState<OpenRequest[]>([]);
+  const [visits, setVisits] = useState<PhysicianVisit[]>([]);
   const [price, setPrice] = useState(String(me.visitPriceCents / 100));
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const loadVisits = useCallback(async () => {
+    try {
+      setVisits((await api.physician.visits()).visits);
+    } catch {
+      /* shown on next refresh */
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadVisits();
+    }, [loadVisits]),
+  );
 
   const poll = useCallback(async () => {
     try {
@@ -262,8 +304,9 @@ function Active({ me, reload }: { me: PhysicianSelf; reload: () => Promise<void>
     setError(null);
     try {
       await api.physician.accept(id);
-      setNotice("Accepted. The patient has been notified.");
+      setNotice("Accepted. Start the video when you're ready.");
       setRequests((rs) => rs.filter((r) => r.requestId !== id));
+      void loadVisits();
     } catch (e) {
       setError((e as Error).message);
       void poll();
@@ -301,6 +344,28 @@ function Active({ me, reload }: { me: PhysicianSelf; reload: () => Promise<void>
       {notice ? <Notice>{notice}</Notice> : null}
       <ErrorText>{error}</ErrorText>
 
+      {visits.length > 0 ? (
+        <>
+          <Label>Your visits</Label>
+          {visits.map((v) => (
+            <Card key={v.requestId}>
+              <Row>
+                <Pill tone={v.status === "IN_VISIT" ? "good" : "info"} text={v.status === "IN_VISIT" ? "IN PROGRESS" : "READY TO START"} />
+                <Pill text={v.ageGroup === "CHILD" ? "Child" : "Adult"} />
+                <Pill text={`Patient in ${v.patientState}`} />
+              </Row>
+              <Body>{v.chiefComplaint}</Body>
+              <Small>Started: {v.symptomDuration} · {specialtyName(v.specialty)}</Small>
+              <Notice>{`Confirm with the patient that they are in ${v.patientState} right now before you begin.`}</Notice>
+              <Button
+                title={v.status === "IN_VISIT" ? "Rejoin video" : "Start video visit"}
+                onPress={() => router.push({ pathname: "/visit/[id]", params: { id: v.requestId } })}
+              />
+            </Card>
+          ))}
+        </>
+      ) : null}
+
       {online ? (
         <>
           <Label>Patient requests</Label>
@@ -326,6 +391,28 @@ function Active({ me, reload }: { me: PhysicianSelf; reload: () => Promise<void>
         <Field label="Price in USD" value={price} onChangeText={setPrice} keyboardType="decimal-pad" />
         <Small>Between $25 and $300. Patients see this before booking.</Small>
         <Button title="Save price" variant="ghost" loading={busy === "price"} onPress={savePrice} />
+      </Card>
+
+      <Card>
+        <Heading>Your plan</Heading>
+        <Small>{`${me.plan.label} · ${money(me.plan.priceCents)}/month${me.subscriptionStatus === "trialing" ? " · free trial" : ""}${me.subscriptionStatus === "past_due" ? " · payment problem" : ""}`}</Small>
+        <Button
+          title="Manage plan or card"
+          variant="ghost"
+          loading={busy === "plan"}
+          onPress={async () => {
+            setBusy("plan");
+            try {
+              const { url } = await api.physician.subscription();
+              await WebBrowser.openBrowserAsync(url);
+              await reload();
+            } catch (e) {
+              setError((e as Error).message);
+            } finally {
+              setBusy(null);
+            }
+          }}
+        />
       </Card>
     </>
   );

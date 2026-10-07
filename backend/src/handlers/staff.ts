@@ -7,7 +7,7 @@ import { audit } from "../lib/audit.js";
 import { notify } from "../lib/notify.js";
 import { getProvider, providersByStatus, tryActivate } from "../lib/providers.js";
 import { assertProviderTransition } from "../domain/stateMachines.js";
-import { subscriptionPlanFor } from "../domain/fees.js";
+import { FOUNDING_PLAN, subscriptionPlanFor } from "../domain/fees.js";
 import * as v from "../domain/validation.js";
 import type { Provider, ProviderStatus } from "../domain/types.js";
 
@@ -123,7 +123,7 @@ export const approve = handler(async (e) => {
   const foundingSeatsUsed = (await providersByStatus("ACTIVE")).filter((x) => x.founding).length +
     (await providersByStatus("APPROVED")).filter((x) => x.founding).length;
   const plan = subscriptionPlanFor(foundingSeatsUsed);
-  await setStatus(p, "APPROVED", { founding: plan.label === "Founding Physician", approvedBy: c.userId });
+  await setStatus(p, "APPROVED", { founding: plan.label === FOUNDING_PLAN.label, approvedBy: c.userId });
   await audit({ actorId: c.userId, actorRole: "STAFF", action: "PROVIDER_APPROVED", resourceType: "PROVIDER", resourceId: p.providerId, result: "ALLOWED", reason: plan.label });
   await notify(p.contact, "PROVIDER_APPROVED");
   await tryActivate({ ...p, status: "APPROVED" });

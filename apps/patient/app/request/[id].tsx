@@ -88,17 +88,33 @@ export default function RequestScreen() {
             <Pill tone="good" text="LICENSE VERIFIED" />
             {r.physician ? <Pill text={specialtyName(r.physician.specialty)} /> : null}
           </Row>
-          <Card>
-            <Heading>Your video visit</Heading>
-            <Small>Video visits are coming in the next build. Your physician will start the visit from their app.</Small>
-          </Card>
+          {r.status === "MATCHED" ? (
+            <Card>
+              <Heading>Your physician is getting ready</Heading>
+              <Small>They're reviewing what you told us. We'll text you the moment they start the video visit. Keep this screen open or come back when you get the text.</Small>
+              <ActivityIndicator color={color.navy} />
+            </Card>
+          ) : (
+            <Card>
+              <Heading>Your physician is ready</Heading>
+              <Small>Find a quiet, private spot. Your visit is private and never recorded.</Small>
+              <Button big title="Join video visit" onPress={() => router.push({ pathname: "/visit/[id]", params: { id: r.requestId } })} />
+            </Card>
+          )}
         </>
       ) : null}
 
       {r.status === "COMPLETED" ? (
         <>
-          <Title>Visit complete</Title>
-          <Body>Your receipt and visit summary will appear here.</Body>
+          <Label>Visit complete</Label>
+          <Title>{r.physician?.name ?? "Your visit"}</Title>
+          {r.patientSummary ? (
+            <Card>
+              <Heading>Your visit summary</Heading>
+              <Body>{r.patientSummary}</Body>
+            </Card>
+          ) : null}
+          <Small>Your card has been charged. A receipt is on its way to your email.</Small>
         </>
       ) : null}
 
@@ -121,7 +137,8 @@ export default function RequestScreen() {
         </Row>
       </Card>
       <ErrorText>{error}</ErrorText>
-      {!waiting ? <Button title="Back to home" onPress={home} /> : null}
+      {r.status === "MATCHED" ? <Button title="Cancel visit" variant="ghost" loading={busy} onPress={cancel} /> : null}
+      {DONE.includes(r.status) ? <Button title="Back to home" onPress={home} /> : null}
       <Notice>If your symptoms get worse or you think it's an emergency, call 911.</Notice>
     </Screen>
   );

@@ -1,4 +1,5 @@
 import type { CareRequestStatus, Provider, ProviderStatus } from "./types.js";
+import { subscriptionOk } from "./eligibility.js";
 
 const PROVIDER_TRANSITIONS: Record<ProviderStatus, ProviderStatus[]> = {
   APPLIED: ["UNDER_REVIEW", "REJECTED"],
@@ -41,5 +42,6 @@ export function activationBlockers(p: Provider): string[] {
   if (!p.licenses.some((l) => l.verifiedAt)) out.push("No verified license");
   if (!p.baaSignedAt) out.push("Business Associate Agreement not signed");
   if (!p.stripeAccountId || !p.stripeChargesEnabled) out.push("Payout account not set up");
+  if (!subscriptionOk(p.subscriptionStatus)) out.push("Subscription not started");
   return out;
 }

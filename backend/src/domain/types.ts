@@ -42,6 +42,10 @@ export interface Provider {
   stripeChargesEnabled: boolean;
   resumeKey?: string;
   founding: boolean;
+  /** Stripe Billing customer for the physician's iHealthé subscription (separate from the payout account). */
+  stripeCustomerId?: string;
+  /** Mirrors Stripe subscription status: trialing, active, past_due, canceled, ... */
+  subscriptionStatus?: string;
   /** From the verified sign-in token. Used only for platform notices. */
   contact: { email?: string; phone?: string };
   createdAt: string;
@@ -83,6 +87,14 @@ export interface CareRequest {
   visitPriceCents?: number;
   bookingFeeCents?: number;
   paymentIntentId?: string;
+  /** Amazon Chime SDK meeting for the video visit. Deleted when the visit ends. */
+  meetingId?: string;
+  startedAt?: string;
+  completedAt?: string;
+  /** Plain-language summary the physician writes for the patient at the end of the visit. */
+  patientSummary?: string;
+  /** Opaque index key "<providerId>" while matched/in visit, for the physician's visit list. */
+  activeProviderId?: string;
   createdAt: string;
   updatedAt: string;
   /** Epoch seconds; DynamoDB TTL removes stale unmatched requests. */
@@ -105,10 +117,12 @@ export type AuditAction =
   | "CARE_REQUEST_ACCEPTED"
   | "CARE_REQUEST_ACCEPT_REJECTED"
   | "VISIT_STARTED"
+  | "VISIT_JOINED"
   | "VISIT_COMPLETED"
   | "PAYMENT_AUTHORIZED"
   | "PAYMENT_CAPTURED"
   | "PAYMENT_RELEASED"
+  | "SUBSCRIPTION_UPDATED"
   | "PROVIDER_LIST_VIEWED"
   | "INTAKE_VIEWED";
 
