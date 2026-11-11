@@ -1,0 +1,5 @@
+User-agent: *
+Disallow: /staff/
+Disallow: /visit.html
+Disallow: /pro/
+Sitemap: https://ihealthe.net/sitemap.xml
