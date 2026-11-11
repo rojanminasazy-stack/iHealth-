@@ -4,97 +4,134 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>iHealthé — See a licensed physician from your phone</title>
-<meta name="description" content="iHealthé connects you with a physician licensed in your state for a video visit, usually within minutes. See the price before you book.">
+<meta name="description" content="iHealthé connects you with a physician licensed in your state for a video visit, usually within minutes. See the full price before you book.">
+<meta property="og:title" content="iHealthé — See a licensed physician from your phone">
+<meta property="og:description" content="Pick a verified physician licensed in your state and meet by video. Transparent pricing.">
 <link rel="stylesheet" href="/site.css">
 </head>
 <body>
-<header class="top">
-  <div class="wrap">
-    <a class="brand" href="/">iHealthé</a>
-    <nav aria-label="Main">
-      <a href="#how">How it works</a>
-      <a href="#pricing">Pricing</a>
-      <a href="/physicians.html">For physicians</a>
-    </nav>
-  </div>
-</header>
-
-<main>
+<!--HEADER-->
+<main id="main">
   <section class="hero">
     <div class="wrap hero-grid">
       <div>
+        <p class="kicker"><span class="dot" aria-hidden="true"></span>Launching first in California</p>
         <h1>A licensed physician, on your phone, in minutes.</h1>
-        <p class="lede">Tell us what's going on and where you are. Pick a physician licensed in your state. See them by video. You see the full price before you book.</p>
+        <p class="lede">Tell us what's going on and where you are. Choose a physician licensed in your state, see their price up front, and meet by private video.</p>
         <div class="cta">
-          <a class="btn btn-light" href="#how">See how it works</a>
+          <a class="btn btn-light" href="/waitlist.html">Join the waitlist</a>
           <a class="btn btn-outline" href="/physicians.html">I'm a physician</a>
         </div>
-        <p class="soon">Launching first in California. iPhone and Android apps are coming soon.</p>
+        <ul class="trust">
+          <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 10.5l3 3 7-7"/></svg>Licenses verified with state boards</li>
+          <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 10.5l3 3 7-7"/></svg>Price shown before you book</li>
+          <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 10.5l3 3 7-7"/></svg>Private, never recorded</li>
+        </ul>
       </div>
-      <aside class="ticket" aria-label="Example visit price">
-        <p class="eyebrow">Example visit</p>
-        <div class="row"><span>Visit with your physician</span><span>$79.00</span></div>
-        <div class="row"><span>iHealthé booking fee</span><span>$9.00</span></div>
-        <div class="row total"><span>Total</span><span>$88.00</span></div>
-        <p class="who">Each physician sets their own visit price. Your card is held at booking and charged only after your visit.</p>
-      </aside>
+      <div class="phone" role="img" aria-label="The iHealthé app showing three physicians licensed in California with their prices, and a total of $88 for the selected visit">
+        <div class="screen" aria-hidden="true">
+          <div class="screen-top">Choose your physician<small>Licensed in California · Family medicine</small></div>
+          <div class="screen-body">
+            <div class="doc on"><div class="avatar">SC</div><div><b>Sarah Chen, MD</b><span>English, Mandarin</span><br><span class="tag">LICENSE VERIFIED</span></div><div class="price">$79</div></div>
+            <div class="doc"><div class="avatar">MR</div><div><b>Miguel Ruiz, DO</b><span>English, Spanish</span><br><span class="tag">LICENSE VERIFIED</span></div><div class="price">$65</div></div>
+            <div class="doc"><div class="avatar">LA</div><div><b>Leila Ahmadi, MD</b><span>English, Farsi</span><br><span class="tag">LICENSE VERIFIED</span></div><div class="price">$85</div></div>
+          </div>
+          <div class="screen-foot">
+            <div class="row"><span>Visit</span><span>$79.00</span></div>
+            <div class="row"><span>Booking fee</span><span>$9.00</span></div>
+            <div class="row total"><span>Total</span><span>$88.00</span></div>
+            <div class="go">Request Dr. Chen</div>
+          </div>
+        </div>
+      </div>
     </div>
   </section>
 
   <section class="band" id="how">
     <div class="wrap">
       <p class="eyebrow">How it works</p>
-      <h2>Three steps, no waiting room</h2>
-      <p class="sub">Built like the ride apps you already use, with the safeguards healthcare needs.</p>
+      <h2>Three steps. No waiting room.</h2>
+      <p class="sub">As simple as the ride apps you already use, with the safeguards healthcare needs.</p>
       <ol class="steps">
         <li><h3>Tell us what's going on</h3><p>Describe your symptoms and confirm where you are right now. Physicians can only treat you in states where they're licensed.</p></li>
-        <li><h3>Choose your physician</h3><p>See verified physicians who can see you today, the languages they speak, and their price.</p></li>
-        <li><h3>Meet by video</h3><p>Your physician starts the visit and you join from the app. Afterward you get a written summary and receipt.</p></li>
+        <li><h3>Choose your physician</h3><p>See verified physicians available today, the languages they speak and their price. Pick the one you want.</p></li>
+        <li><h3>Meet by video</h3><p>Your physician starts the visit and you join from the app. Afterward you get a written summary and a receipt.</p></li>
       </ol>
     </div>
   </section>
 
-  <section class="band alt" id="trust">
-    <div class="wrap two">
-      <div>
-        <p class="eyebrow">Safety and privacy</p>
-        <h2>Every physician is checked before they see you</h2>
-        <p class="sub">Our team confirms each license with the state medical board and checks the physician's NPI before they can go online.</p>
+  <section class="band alt" id="why">
+    <div class="wrap">
+      <p class="eyebrow">Why iHealthé</p>
+      <h2>Care you can trust, at a price you can see</h2>
+      <p class="sub">Built from day one for privacy, safety and fairness.</p>
+      <div class="features">
+        <div class="feature">
+          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 8.3-7 10-4-1.7-7-5.5-7-10V6l7-3z"/><path d="M9 12l2 2 4-4"/></svg></div>
+          <h3>Every physician is checked</h3>
+          <p>Our team confirms each license with the state medical board and checks the physician's NPI before they can see anyone.</p>
+        </div>
+        <div class="feature">
+          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 018 0v3"/></svg></div>
+          <h3>Your information stays private</h3>
+          <p>Encrypted in transit and at rest. Never sold, never used for ads. Texts and emails never mention your health.</p>
+        </div>
+        <div class="feature">
+          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v10M15 9.5c0-1.4-1.3-2-3-2s-3 .8-3 2.2c0 3.3 6 1.8 6 4.8 0 1.4-1.3 2.2-3 2.2s-3-.8-3-2"/></svg></div>
+          <h3>Transparent pricing</h3>
+          <p>You see the full price before you book. Your card is held, not charged, until your visit is done.</p>
+        </div>
+        <div class="feature">
+          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 5h11a2 2 0 012 2v10a2 2 0 01-2 2H4z"/><path d="M17 10l4-3v10l-4-3"/></svg></div>
+          <h3>Private video visits</h3>
+          <p>Secure, high-quality video right in the app. Visits are never recorded.</p>
+        </div>
+        <div class="feature">
+          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 6h16M4 12h10M4 18h7"/><circle cx="18" cy="16" r="3"/></svg></div>
+          <h3>A physician who speaks your language</h3>
+          <p>Filter by language, so you can describe what's going on in the words you're most comfortable with.</p>
+        </div>
+        <div class="feature">
+          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M7 3h10v18H7z"/><path d="M10 7h4M10 11h4M10 15h2"/></svg></div>
+          <h3>A summary after every visit</h3>
+          <p>Your physician writes down what you discussed and the plan, so you have it when you need it.</p>
+        </div>
       </div>
-      <ul class="checks">
-        <li>Licenses verified with state medical boards, and rechecked before they expire</li>
-        <li>Two-step sign-in for every physician</li>
-        <li>Your health information is encrypted and never sold or used for ads</li>
-        <li>Texts and emails never mention your symptoms or health details</li>
-        <li>Video visits are private and never recorded</li>
-      </ul>
     </div>
   </section>
 
   <section class="band" id="pricing">
-    <div class="wrap narrow">
-      <p class="eyebrow">Pricing</p>
-      <h2>The price you see is the price you pay</h2>
-      <p class="sub">Physicians set their own visit price, between $25 and $300. iHealthé adds one flat $9 booking fee. No membership, no surprise bills.</p>
-      <details><summary>When is my card charged?</summary><p>We place a hold when you book. You're charged only after your visit is complete. If you cancel before the physician accepts, or nobody accepts, the hold is released.</p></details>
-      <details><summary>Do you take insurance?</summary><p>Not yet. Many patients use an HSA or FSA card. We can give you a receipt for reimbursement.</p></details>
-      <details><summary>Which states are available?</summary><p>We're launching in California first. You'll only see physicians licensed in the state you're in at the time of the visit.</p></details>
-      <details><summary>Is iHealthé for emergencies?</summary><p>No. If you think you're having a medical emergency, call 911 or go to the nearest emergency room.</p></details>
+    <div class="wrap two">
+      <div>
+        <p class="eyebrow">Pricing</p>
+        <h2>The price you see is the price you pay</h2>
+        <p class="sub" style="margin-bottom:24px">Physicians set their own visit price, between $25 and $300. iHealthé adds one flat $9 booking fee. No membership, no surprise bills.</p>
+        <details><summary>When is my card charged?</summary><p>We place a hold when you book. You're charged only after your visit is complete. If you cancel before the physician accepts, or nobody accepts, the hold is released.</p></details>
+        <details><summary>Do you take insurance?</summary><p>Not yet. Many patients use an HSA or FSA card. Your receipt works for reimbursement.</p></details>
+        <details><summary>Which states are available?</summary><p>We're launching in California first. You'll only see physicians licensed in the state you're in at the time of your visit.</p></details>
+        <details><summary>Is iHealthé for emergencies?</summary><p>No. If you think you're having a medical emergency, call 911 or go to the nearest emergency room.</p></details>
+      </div>
+      <aside class="ticket" aria-label="Example visit price">
+        <p class="eyebrow">Example visit</p>
+        <div class="row"><span>Visit with your physician</span><span>$79.00</span></div>
+        <div class="row"><span>iHealthé booking fee</span><span>$9.00</span></div>
+        <div class="row total"><span>Total</span><span>$88.00</span></div>
+        <p class="who">Each physician sets their own price. You'll always see it before you book.</p>
+      </aside>
+    </div>
+  </section>
+
+  <section class="closer">
+    <div class="wrap">
+      <h2>Be first in line when we launch</h2>
+      <p>Join the waitlist and we'll email you the day iHealthé opens in your state. No spam, and we never ask about your health.</p>
+      <div class="cta">
+        <a class="btn btn-light" href="/waitlist.html">Join the waitlist</a>
+        <a class="btn btn-outline" href="/physicians.html">Physicians: apply to join</a>
+      </div>
     </div>
   </section>
 </main>
-
-<footer>
-  <div class="wrap">
-    <div>
-      <p class="emergency">Medical emergency? Call 911.</p>
-      <p>© 2026 iHealthé LLC · Valencia, California</p>
-    </div>
-    <div>
-      <p><a href="/physicians.html">For physicians</a> · <a href="/privacy.html">Privacy</a> · <a href="/terms.html">Terms</a></p>
-      <p>Questions: support@ihealthe.net</p>
-    </div>
-  </div>
-</footer>
+<!--FOOTER-->
 </body>
 </html>
