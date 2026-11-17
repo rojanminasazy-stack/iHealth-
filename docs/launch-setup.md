@@ -1,141 +1,72 @@
-# Launch setup: AWS, domain, Stripe
+# Switching on the backend (AWS)
 
-Do these in order. You don't need to install anything on your computer. Every command runs in **AWS CloudShell**, a terminal inside the AWS website.
+The website already runs free on GitHub Pages, and ihealthe.net stays at GoDaddy. This guide switches on the secure backend: accounts, confirmation codes, the welcome text, patient profiles, payments and video.
 
-Rough cost while testing: $30–80/month (Route 53 $0.50, KMS key $1, Cognito Plus, Lambda/DynamoDB/CloudFront mostly free tier). Video is about $0.0017 per person-minute.
+No coding. Every command runs in **AWS CloudShell**, a terminal inside the AWS website. You copy, paste and press Enter.
 
----
+## Part 1: Create the AWS account (about 15 minutes)
+1. Go to **https://portal.aws.amazon.com/billing/signup**
+2. Email: an address you'll keep. Account name: `iHealthe LLC`.
+3. Confirm the code AWS emails you, then create a strong root password.
+4. Contact information: choose **Business**. Enter the LLC's legal name and address.
+5. Add a payment card. AWS charges $1 to check it, then refunds it.
+6. Confirm your phone number by text or call.
+7. Support plan: **Basic support – Free**.
 
-## 1. Create the AWS account
+If you land on a page called **Projects** (AWS's new setup page), click **Create project**, name it `iHealthe`, finish the steps, then open the AWS console from it.
 
-1. Go to **aws.amazon.com** and choose **Create an AWS Account**. Use a company email like `aws@ihealthe.net` once email works, or your own for now.
-2. Account name: `iHealthe LLC`. Choose **Business** and enter the LLC's details and EIN.
-3. Add a payment card.
-4. Sign in as the root user. Open **IAM → Dashboard** and **add MFA to the root user** (an authenticator app). Do this before anything else.
+## Part 2: Lock the account (2 minutes)
+1. In the search bar at the top of the AWS console, type **IAM** and open it.
+2. You'll see "Add MFA for root user." Click **Add MFA** → **Authenticator app** → scan the code with Google Authenticator or your phone's password app → enter two codes in a row.
 
-## 2. Accept the AWS BAA
+## Part 3: Accept the HIPAA agreement (BAA) (2 minutes)
+1. In the search bar, type **Artifact** and open **AWS Artifact**.
+2. Click **Agreements** → **Account agreements**.
+3. Click **AWS Business Associate Addendum** → **Accept agreement**. Read it and accept.
 
-1. In the AWS console search bar, type **Artifact** and open **AWS Artifact**.
-2. Choose **Agreements → Account agreements**.
-3. Find **AWS Business Associate Addendum**, choose **Accept agreement**, and follow the prompts.
-4. Download a copy for your records (HIPAA requires keeping it 6 years).
-
-## 3. Create your everyday admin login
-
-Don't use the root user day to day.
-
-1. Open **IAM Identity Center** and choose **Enable**. Choose region **US West (Oregon) us-west-2** if it asks.
-2. **Users → Add user**: your name and email. Turn on MFA when you first sign in.
-3. **Permission sets → Create → Predefined → AdministratorAccess**.
-4. **AWS accounts →** select your account → **Assign users** → you → AdministratorAccess.
-5. Sign out of root. From now on, sign in through the Identity Center link it emails you.
-
-## 4. Deploy, part 1: the domain
-
-1. In the AWS console, set the region (top right) to **US West (Oregon)**.
-2. Open **CloudShell** (the `>_` icon in the top bar). Paste:
+## Part 4: Turn on the backend (about 20 minutes, mostly waiting)
+1. Top right of the console, set the region to **US West (Oregon)**.
+2. Click the **CloudShell** icon (a small `>_` square at the top). Wait for the black window to open.
+3. Paste this whole block and press Enter:
 
 ```bash
 git clone https://github.com/rojanminasazy-stack/iHealth-.git ihealthe && cd ihealthe
-npm install -w backend -w infra -w website   # skips the phone apps to fit CloudShell storage
-npm run build -w website
+npm install -w backend -w infra --no-audit --no-fund
 cd infra
-npx cdk bootstrap aws://$(aws sts get-caller-identity --query Account --output text)/us-west-2 aws://$(aws sts get-caller-identity --query Account --output text)/us-east-1
-npx cdk deploy ihealthe-dev-dns --require-approval never &
-sleep 90; aws route53 list-hosted-zones-by-name --dns-name ihealthe.net --query "HostedZones[0].Id" --output text | xargs -I{} aws route53 get-hosted-zone --id {} --query "DelegationSet.NameServers" --output text
+npx cdk bootstrap
+npx cdk deploy --require-approval never
 ```
 
-3. The last line prints **four nameservers** like `ns-123.awsdns-45.com`. Copy them.
-4. Leave CloudShell open. The deploy keeps running and waits for step 5.
+4. Wait until you see **Outputs:** followed by a list. Copy everything from **Outputs** down and send it to me. Those are public addresses, not passwords.
 
-## 5. Point ihealthe.net at AWS (GoDaddy)
+## Part 5: Let AWS send email from ihealthe.net (GoDaddy, 5 minutes)
+The outputs include three lines starting with `GoDaddyDkim`. For each one:
+1. GoDaddy → **My Products** → ihealthe.net → **DNS** → **Add New Record**.
+2. Type: **CNAME**. Name and Value: copy from that output line.
+3. Save. Do not touch the existing website records.
 
-1. Sign in to GoDaddy → **My Products → ihealthe.net → DNS → Nameservers → Change nameservers**.
-2. Choose **I'll use my own nameservers** and paste the four from step 4.
-3. Save. GoDaddy may ask you to confirm. The switch usually takes 15 minutes to a few hours.
-4. Back in CloudShell, the domain deploy finishes on its own once AWS sees the change.
+## Part 6: Ask AWS to let you email everyone (1 minute + about a day)
+1. Search **SES** → open **Amazon Simple Email Service** (Oregon).
+2. Click **Get set up** → **Request production access**.
+3. Mail type: **Transactional**. Website: `https://ihealthe.net`.
+4. Use case (copy this): *iHealthé sends account verification codes, welcome messages and appointment confirmations to patients and physicians who sign up in our app. Messages contain no health information. We only email people who created an account.*
 
-> After this, DNS for ihealthe.net is managed in AWS Route 53. If you use GoDaddy email, tell me first so I can add its records to Route 53 before you switch.
+## Part 7: Text messages (1–3 weeks for approval)
+1. Search **End User Messaging** → **SMS** → **Phone numbers** → **Request originator** → **Toll-free**, capability **SMS**.
+2. Complete the registration. Use case: *Account notifications*. Sample message: `Welcome to iHealthé! Your account is ready. Reply STOP to opt out.`
+3. Send me the number when it's approved.
 
-## 6. Create the Stripe account
-
-1. Go to **dashboard.stripe.com/register**. Use the LLC's legal name, EIN and business bank account.
-2. Business type: **Healthcare → Telemedicine / medical services**. Website: `https://ihealthe.net`.
-3. Turn on **Connect** (Settings → Connect → Get started). Choose **Platform or marketplace** and **Express** accounts.
-4. Stay in **Test mode** (toggle at top) until launch.
-
-**Keep your secret key private.** It starts with `sk_test_` and can move money. Don't paste it into chat, email or a document. It goes into AWS in step 8.
-
-Send me the **publishable key** (`pk_test_...`) when you have it. That one is safe to share; it goes in the patient app.
-
-## 7. Deploy, part 2: the backend and website
-
-In CloudShell (still inside `ihealthe/infra`):
-
-```bash
-npx cdk deploy ihealthe-dev --require-approval never
-```
-
-This takes 10–20 minutes. At the end it prints **Outputs**. Copy them all into a note and send them to me. They're public identifiers, not secrets.
-
-## 8. Put your Stripe keys into AWS
-
-1. In Stripe (test mode): **Developers → Webhooks → Add endpoint**.
-   - Endpoint URL: the `StripeWebhookUrl` from step 7's outputs.
-   - Events: `account.updated`, `payment_intent.amount_capturable_updated`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`.
-   - Turn on **Listen to events on Connected accounts** as well.
-   - Save, then reveal the **Signing secret** (`whsec_...`).
-2. In AWS: **Secrets Manager →** open the secret named in `StripeSecretName` → **Retrieve secret value → Edit → Plaintext**, and paste:
+## Part 8: Stripe (payments)
+1. Sign up at **dashboard.stripe.com/register** with the LLC's details and bank account.
+2. Turn on **Connect** → **Platform or marketplace** → **Express** accounts.
+3. Stay in **Test mode** for now.
+4. Send me the **publishable key** (`pk_test_...`). **Never send the secret key** (`sk_test_...`). It goes straight into AWS: Secrets Manager → open the secret named in the `StripeSecretName` output → **Retrieve secret value** → **Edit** → paste:
 
 ```json
 {"secretKey":"sk_test_PASTE_HERE","webhookSecret":"whsec_PASTE_HERE"}
 ```
 
-3. Save. That's it; the backend reads it automatically.
+(The webhook secret comes from Stripe → Developers → Webhooks → Add endpoint, using the `StripeWebhookUrl` output. I'll walk you through that when you get there.)
 
-## 9. Turn on real email sending
-
-New AWS accounts can only email verified addresses ("sandbox").
-
-1. Open **Amazon SES** (us-west-2) → **Get set up → Request production access**.
-2. Mail type: **Transactional**. Website: `https://ihealthe.net`.
-3. Use case (copy this): *"iHealthé sends account verification codes and appointment confirmations to patients and physicians who sign up in our app. Messages contain no health information. We handle bounces and complaints and only email users who created an account."*
-4. Approval usually takes about a day.
-
-## 10. Text messages (SMS)
-
-Sign-in codes are texted by Cognito. Visit confirmations need your own number.
-
-1. Open **AWS End User Messaging SMS** (us-west-2) → **Phone numbers → Request** → **Toll-free**, capability **SMS**.
-2. Complete **toll-free registration** with the LLC details. Use case: *Account notifications*. Sample message: `Your iHealthé visit is confirmed. Open the app to join when you're ready. Reply STOP to opt out.`
-3. Registration takes 1–3 weeks. Send me the number once it's active.
-4. Also request a spending limit increase (**Account settings → Spend limits**). The default is $1/month.
-
-## 11. Create your first staff login (credentialing)
-
-In CloudShell:
-
-```bash
-POOL=$(aws cloudformation describe-stacks --stack-name ihealthe-dev --query "Stacks[0].Outputs[?OutputKey=='StaffPoolId'].OutputValue" --output text)
-aws cognito-idp admin-create-user --user-pool-id $POOL --username you@ihealthe.net \
-  --user-attributes Name=email,Value=you@ihealthe.net Name=email_verified,Value=true Name=phone_number,Value=+1XXXXXXXXXX Name=phone_number_verified,Value=true
-aws cognito-idp admin-add-user-to-group --user-pool-id $POOL --username you@ihealthe.net --group-name credentialing
-```
-
-You'll get an email with a temporary password. Sign in at **https://ihealthe.net/staff/**. It asks you to set a new password, then texts you a code each time.
-
-## 12. App stores
-
-- **Apple:** developer.apple.com/programs/enroll → **Organization**. You need a free D-U-N-S number for the LLC first (Apple links to the lookup). $99/year. Takes 1–2 weeks.
-- **Google:** play.google.com/console → **Organization** account. $25 one-time. Google requires 12+ testers for 14 days before a new organization's first public release, so start recruiting testers early.
-
----
-
-## What to send me
-
-- [ ] Stripe publishable key (`pk_test_...`)
-- [ ] The outputs from step 7
-- [ ] Your toll-free number when it's approved
-- [ ] Apple Team ID and Google Play developer account email when those are ready
-
-Never send: AWS passwords, the Stripe secret key, webhook signing secret, or any patient information.
+## Never send in chat
+AWS passwords, MFA codes, the Stripe secret key, the webhook secret, or any patient information.

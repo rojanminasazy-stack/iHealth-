@@ -15,25 +15,16 @@ import * as authorizers from "aws-cdk-lib/aws-apigatewayv2-authorizers";
 import * as integrations from "aws-cdk-lib/aws-apigatewayv2-integrations";
 import * as cloudtrail from "aws-cdk-lib/aws-cloudtrail";
 import * as secrets from "aws-cdk-lib/aws-secretsmanager";
-import * as route53 from "aws-cdk-lib/aws-route53";
-import * as targets from "aws-cdk-lib/aws-route53-targets";
-import type * as acm from "aws-cdk-lib/aws-certificatemanager";
-import * as cloudfront from "aws-cdk-lib/aws-cloudfront";
-import * as origins from "aws-cdk-lib/aws-cloudfront-origins";
-import * as s3deploy from "aws-cdk-lib/aws-s3-deployment";
 import * as ses from "aws-cdk-lib/aws-ses";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const HANDLERS = path.join(here, "../../backend/src/handlers");
-const SITE_DIST = path.join(here, "../../website/dist");
 
 export interface IHealtheProps extends StackProps {
   stage: string;
   emailFrom: string;
   appUrl: string;
   domain: string;
-  zone: route53.IHostedZone;
-  certificate: acm.ICertificate;
 }
 
 /**
@@ -339,85 +330,17 @@ export class IHealtheStack extends Stack {
     });
     trail.addS3EventSelector([{ bucket: documents }], { readWriteType: cloudtrail.ReadWriteType.ALL });
 
-    // ── Email: verify the domain in SES with DKIM records written straight into Route 53 ──
-    new ses.EmailIdentity(this, "EmailDomain", {
-      identity: ses.Identity.publicHostedZone(props.zone),
-      mailFromDomain: `mail.${props.domain}`,
+    // ── Email: verify ihealthe.net in SES. DNS stays at GoDaddy (the website runs on GitHub Pages),
+    //    so the three DKIM records are printed as outputs to add in GoDaddy by hand. ──
+    const emailDomain = new ses.EmailIdentity(this, "EmailDomain", {
+      identity: ses.Identity.domain(props.domain),
     });
-
-    // ── Website (ihealthe.net): private S3 bucket behind CloudFront, HTTPS only, strict security headers ──
-    const siteBucket = new s3.Bucket(this, "Site", {
-      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
-      encryption: s3.BucketEncryption.S3_MANAGED,
-      enforceSSL: true,
-      removalPolicy: RemovalPolicy.DESTROY,
-      autoDeleteObjects: true,
+    emailDomain.dkimRecords.forEach((r, i) => {
+      new CfnOutput(this, `GoDaddyDkim${i + 1}`, {
+        value: `CNAME  name: ${r.name.replace(`.${props.domain}`, "")}  value: ${r.value}`,
+        description: "Add this CNAME record in GoDaddy DNS so iHealthé can send email",
+      });
     });
-    const apiOrigin = api.apiEndpoint;
-    const headers = new cloudfront.ResponseHeadersPolicy(this, "SiteHeaders", {
-      securityHeadersBehavior: {
-        contentSecurityPolicy: {
-          override: true,
-          contentSecurityPolicy: [
-            "default-src 'self'",
-            "script-src 'self'",
-            "style-src 'self' 'unsafe-inline'",
-            "img-src 'self' data:",
-            "media-src 'self' blob: mediastream:",
-            "worker-src 'self' blob:",
-            `connect-src 'self' ${apiOrigin} https://cognito-idp.${this.region}.amazonaws.com https://*.chime.aws wss://*.chime.aws https://*.amazonaws.com`,
-            "frame-ancestors 'none'",
-            "base-uri 'none'",
-            "form-action 'self'",
-          ].join("; "),
-        },
-        strictTransportSecurity: { override: true, accessControlMaxAge: Duration.days(730), includeSubdomains: true, preload: true },
-        contentTypeOptions: { override: true },
-        frameOptions: { override: true, frameOption: cloudfront.HeadersFrameOption.DENY },
-        referrerPolicy: { override: true, referrerPolicy: cloudfront.HeadersReferrerPolicy.NO_REFERRER },
-      },
-      customHeadersBehavior: {
-        customHeaders: [{ header: "Permissions-Policy", value: "camera=(self), microphone=(self), geolocation=()", override: true }],
-      },
-    });
-    // Pretty URLs: /physicians → /physicians.html, /staff/ → /staff/index.html
-    const rewrite = new cloudfront.Function(this, "PrettyUrls", {
-      runtime: cloudfront.FunctionRuntime.JS_2_0,
-      code: cloudfront.FunctionCode.fromInline(
-        "function handler(e){var r=e.request,u=r.uri;if(u.endsWith('/'))r.uri=u+'index.html';else if(u.lastIndexOf('.')<u.lastIndexOf('/')+1)r.uri=u+'.html';return r;}",
-      ),
-    });
-    const dist = new cloudfront.Distribution(this, "SiteCdn", {
-      defaultRootObject: "index.html",
-      domainNames: [props.domain, `www.${props.domain}`],
-      certificate: props.certificate,
-      minimumProtocolVersion: cloudfront.SecurityPolicyProtocol.TLS_V1_2_2021,
-      defaultBehavior: {
-        origin: origins.S3BucketOrigin.withOriginAccessControl(siteBucket),
-        viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-        responseHeadersPolicy: headers,
-        functionAssociations: [{ function: rewrite, eventType: cloudfront.FunctionEventType.VIEWER_REQUEST }],
-      },
-      errorResponses: [{ httpStatus: 403, responseHttpStatus: 404, responsePagePath: "/index.html", ttl: Duration.minutes(5) }],
-    });
-    new s3deploy.BucketDeployment(this, "SiteDeploy", {
-      destinationBucket: siteBucket,
-      distribution: dist,
-      sources: [
-        s3deploy.Source.asset(SITE_DIST),
-        // Public identifiers only (no secrets) for the staff portal.
-        s3deploy.Source.jsonData("config.json", {
-          apiUrl: api.apiEndpoint,
-          staffPoolId: staff.pool.userPoolId,
-          staffClientId: staff.client.userPoolClientId,
-        }),
-      ],
-    });
-    for (const name of [props.domain, `www.${props.domain}`]) {
-      const target = route53.RecordTarget.fromAlias(new targets.CloudFrontTarget(dist));
-      new route53.ARecord(this, `Site-A-${name}`, { zone: props.zone, recordName: name, target });
-      new route53.AaaaRecord(this, `Site-AAAA-${name}`, { zone: props.zone, recordName: name, target });
-    }
 
     // ── Outputs the apps need ──
     new CfnOutput(this, "ApiUrl", { value: api.apiEndpoint });
@@ -429,6 +352,5 @@ export class IHealtheStack extends Stack {
     new CfnOutput(this, "StaffClientId", { value: staff.client.userPoolClientId });
     new CfnOutput(this, "StripeSecretName", { value: stripeSecret.secretName });
     new CfnOutput(this, "StripeWebhookUrl", { value: `${api.apiEndpoint}/webhooks/stripe` });
-    new CfnOutput(this, "SiteUrl", { value: `https://${props.domain}` });
   }
 }
