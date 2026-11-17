@@ -107,6 +107,12 @@ export class IHealtheStack extends Stack {
       removalPolicy: RemovalPolicy.RETAIN,
     });
 
+    // Patient "About you" answers (PHI). Encrypted with the PHI key, point-in-time recovery on.
+    const patientsTable = new ddb.Table(this, "PatientProfiles", {
+      ...tableDefaults,
+      partitionKey: { name: "userId", type: ddb.AttributeType.STRING },
+    });
+
     const counters = new ddb.Table(this, "Counters", {
       ...tableDefaults,
       partitionKey: { name: "name", type: ddb.AttributeType.STRING },
@@ -183,6 +189,7 @@ export class IHealtheStack extends Stack {
       PROVIDERS_TABLE: providers.tableName,
       REQUESTS_TABLE: requests.tableName,
       AUDIT_TABLE: auditTable.tableName,
+      PATIENTS_TABLE: patientsTable.tableName,
       COUNTERS_TABLE: counters.tableName,
       DOCUMENTS_BUCKET: documents.bucketName,
       KMS_KEY_ARN: key.keyArn,
@@ -223,6 +230,7 @@ export class IHealtheStack extends Stack {
       providers.grantReadWriteData(f);
       requests.grantReadWriteData(f);
       counters.grantReadWriteData(f);
+      patientsTable.grantReadWriteData(f);
       // Audit is append-only: PutItem, nothing else.
       f.addToRolePolicy(new iam.PolicyStatement({ actions: ["dynamodb:PutItem"], resources: [auditTable.tableArn] }));
       key.grantEncryptDecrypt(f);
@@ -274,6 +282,8 @@ export class IHealtheStack extends Stack {
 
     const { GET, POST, PUT } = apigw.HttpMethod;
     // Patients
+    route(GET, "/patient/profile", authPatient, "profile", "get");
+    route(PUT, "/patient/profile", authPatient, "profile", "put");
     route(GET, "/patient/physicians", authPatient, "patient", "listPhysicians");
     route(POST, "/patient/requests", authPatient, "patient", "createRequest");
     route(GET, "/patient/requests/{id}", authPatient, "patient", "getRequest");
@@ -285,7 +295,6 @@ export class IHealtheStack extends Stack {
     route(POST, "/physician/resume-upload", authPhysician, "physician", "resumeUploadUrl");
     route(POST, "/physician/baa", authPhysician, "physician", "signBaa");
     route(POST, "/physician/payouts", authPhysician, "physician", "payoutsLink");
-    route(PUT, "/physician/price", authPhysician, "physician", "setPrice");
     route(POST, "/physician/online", authPhysician, "physician", "setOnline");
     route(GET, "/physician/requests", authPhysician, "physician", "openRequests");
     route(POST, "/physician/requests/{id}/accept", authPhysician, "physician", "accept");
@@ -303,6 +312,9 @@ export class IHealtheStack extends Stack {
     route(POST, "/staff/providers/{id}/suspend", authStaff, "staff", "suspend");
     // Stripe (signature-verified inside the handler)
     route(POST, "/webhooks/stripe", undefined, "stripeWebhook", "main");
+
+    // Welcome email + text when a patient confirms their account.
+    patients.pool.addTrigger(cognito.UserPoolOperation.POST_CONFIRMATION, fn("welcome", "main"));
 
     // Upload/view links need S3 access for the physician + staff handlers.
     for (const f of fns) documents.grantReadWrite(f);

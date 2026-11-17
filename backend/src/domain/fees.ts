@@ -1,12 +1,15 @@
 /**
- * Hybrid fee model.
- *  - Patient pays: physician's visit price + flat booking fee.
- *  - Visit price goes to the physician's own Stripe account. iHealthé keeps only the booking fee.
- *  - Physicians pay a flat monthly subscription, billed separately.
- * No percentage of the medical fee is ever taken (see docs/fee-model.md).
+ * Patient pricing (no booking fee):
+ *  - Pay per visit: flat $79 for a 20-minute video visit, paid to the physician's own Stripe account.
+ *  - Unlimited membership: $99/month. How physicians are paid for member visits is pending legal review
+ *    (see docs/fee-model.md) and is not wired up yet.
+ * Physicians pay a flat monthly platform subscription, billed separately.
  */
 export const FEES = {
-  bookingFeeCents: 900,
+  bookingFeeCents: 0,
+  visitPriceCents: 7_900,
+  membershipMonthlyCents: 9_900,
+  visitMinutes: 20,
   subscriptionStandardCents: 19_900,
   subscriptionFoundingCents: 9_900,
   foundingTrialDays: 90,
@@ -37,7 +40,7 @@ export function validateVisitPrice(cents: number): void {
 }
 
 /** Server-side quote. The app never sends a price; it is always computed here. */
-export function quote(visitPriceCents: number): Quote {
+export function quote(visitPriceCents: number = FEES.visitPriceCents): Quote {
   validateVisitPrice(visitPriceCents);
   const bookingFeeCents = FEES.bookingFeeCents;
   return {

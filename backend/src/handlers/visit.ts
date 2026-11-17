@@ -8,7 +8,28 @@ import { addAttendee, endMeeting, ensureMeeting } from "../lib/video.js";
 import { captureVisit } from "../lib/payments.js";
 import { assertRequestTransition } from "../domain/stateMachines.js";
 import * as v from "../domain/validation.js";
-import type { CareRequest } from "../domain/types.js";
+import type { CareRequest, PatientProfile } from "../domain/types.js";
+import { getPatientProfile } from "./profile.js";
+import { FEES } from "../domain/fees.js";
+import { ageOn } from "../domain/validation.js";
+import { todayIso } from "../lib/db.js";
+
+/** What the matched physician sees about the patient. Only after the match (minimum necessary before it). */
+function patientForPhysician(p: PatientProfile | undefined) {
+  if (!p) return null;
+  return {
+    fullName: p.fullName,
+    dateOfBirth: p.dateOfBirth,
+    age: ageOn(p.dateOfBirth, todayIso()),
+    phone: p.phone,
+    address: p.address,
+    stateOfResidence: p.stateOfResidence,
+    medicalHistory: p.medicalHistory,
+    medications: p.medications,
+    chronicConditions: p.chronicConditions,
+    allergies: p.allergies,
+  };
+}
 
 async function load(e: Event): Promise<CareRequest> {
   const id = e.pathParameters?.id;
@@ -98,7 +119,10 @@ export const physicianVisits = handler(async (e) => {
       Limit: 20,
     }),
   );
-  const visits = ((r.Items ?? []) as CareRequest[]).map((x) => ({
+  const items = (r.Items ?? []) as CareRequest[];
+  const profiles = new Map<string, PatientProfile | undefined>();
+  for (const x of items) if (!profiles.has(x.patientUserId)) profiles.set(x.patientUserId, await getPatientProfile(x.patientUserId));
+  const visits = items.map((x) => ({
     requestId: x.requestId,
     status: x.status,
     ageGroup: x.ageGroup,
@@ -107,6 +131,8 @@ export const physicianVisits = handler(async (e) => {
     chiefComplaint: x.chiefComplaint,
     symptomDuration: x.symptomDuration,
     createdAt: x.createdAt,
+    visitMinutes: FEES.visitMinutes,
+    patient: patientForPhysician(profiles.get(x.patientUserId)),
   }));
   if (visits.length) {
     await audit({ actorId: c.userId, actorRole: "PHYSICIAN", action: "INTAKE_VIEWED", resourceType: "CARE_REQUEST", resourceId: visits.map((x) => x.requestId).join(",").slice(0, 900), result: "ALLOWED" });

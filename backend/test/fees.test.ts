@@ -1,19 +1,19 @@
 import { describe, expect, it } from "vitest";
 import { FEES, quote, subscriptionPlanFor, FeeError } from "../src/domain/fees.js";
 
-describe("hybrid fees", () => {
-  it("patient pays visit price + booking fee; physician gets the full visit price", () => {
-    expect(quote(7_900)).toEqual({
-      visitPriceCents: 7_900,
-      bookingFeeCents: 900,
-      totalCents: 8_800,
-      platformFeeCents: 900,
-      physicianReceivesCents: 7_900,
-    });
+describe("patient pricing", () => {
+  it("default visit is a flat $79 with no booking fee", () => {
+    expect(quote()).toEqual({ visitPriceCents: 7_900, bookingFeeCents: 0, totalCents: 7_900, platformFeeCents: 0, physicianReceivesCents: 7_900 });
+    expect(FEES.membershipMonthlyCents).toBe(9_900);
+    expect(FEES.visitMinutes).toBe(20);
   });
+});
 
-  it("platform fee is flat, never a percentage of the visit", () => {
-    expect(quote(2_500).platformFeeCents).toBe(quote(30_000).platformFeeCents);
+describe("custom visit prices", () => {
+
+  it("platform never takes a percentage of the visit", () => {
+    expect(quote(2_500).platformFeeCents).toBe(0);
+    expect(quote(30_000).physicianReceivesCents).toBe(30_000);
   });
 
   it("rejects prices outside limits or fractional cents", () => {

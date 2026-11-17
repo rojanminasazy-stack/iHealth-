@@ -99,7 +99,7 @@ export default function Choose() {
         refreshControl={<RefreshControl refreshing={false} onRefresh={load} />}
       >
         <Small>
-          Licensed in {intake.patientState} · {specialtyName(intake.specialty)} · {intake.ageGroup === "CHILD" ? "Child" : "Adult"}
+          Licensed in {intake.patientState} · {specialtyName(intake.specialty)} · 20-minute video visit
         </Small>
         {list === null ? <ActivityIndicator color={color.navy} /> : null}
         {list?.length === 0 && !error ? (
@@ -115,7 +115,7 @@ export default function Choose() {
               <Card style={on ? { borderColor: color.navy, borderWidth: 2 } : undefined}>
                 <Row style={{ justifyContent: "space-between" }}>
                   <Heading>{p.name}</Heading>
-                  <Body style={{ fontWeight: "700", color: color.navy }}>{money(p.visitPriceCents)}</Body>
+                  <Body style={{ fontWeight: "700", color: color.navy }}>{money(p.quote.totalCents)}</Body>
                 </Row>
                 <Row>
                   <Pill tone="good" text="LICENSE VERIFIED" />
@@ -133,12 +133,8 @@ export default function Choose() {
         <View style={{ padding: space.lg, gap: space.md, backgroundColor: color.surface, borderTopWidth: 1, borderColor: color.line }}>
           <Label>Your total</Label>
           <Row style={{ justifyContent: "space-between" }}>
-            <Small>Visit with {picked.name}</Small>
+            <Small>20-minute visit with {picked.name}</Small>
             <Small>{money(picked.quote.visitPriceCents)}</Small>
-          </Row>
-          <Row style={{ justifyContent: "space-between" }}>
-            <Small>iHealthé booking fee</Small>
-            <Small>{money(picked.quote.bookingFeeCents)}</Small>
           </Row>
           <Row style={{ justifyContent: "space-between" }}>
             <Body style={{ fontWeight: "700" }}>Total</Body>

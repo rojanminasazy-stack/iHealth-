@@ -42,6 +42,22 @@ export interface JoinInfo {
   attendee: unknown;
 }
 
+export interface PatientProfileInput {
+  fullName: string;
+  dateOfBirth: string;
+  phone: string;
+  address: { line1: string; line2?: string; city: string; state: string; zip: string };
+  stateOfResidence: string;
+  medicalHistory: string;
+  medications: string;
+  chronicConditions: string;
+  allergies: string;
+}
+
+export interface PatientForPhysician extends PatientProfileInput {
+  age: number;
+}
+
 export interface PhysicianVisit {
   requestId: string;
   status: "MATCHED" | "IN_VISIT";
@@ -51,6 +67,8 @@ export interface PhysicianVisit {
   chiefComplaint: string;
   symptomDuration: string;
   createdAt: string;
+  visitMinutes: number;
+  patient: PatientForPhysician | null;
 }
 
 export interface RequestStatus {
@@ -115,6 +133,8 @@ export function createApi(baseUrl: string, auth: Auth) {
 
   return {
     patient: {
+      profile: () => call<{ profile: PatientProfileInput | null }>("GET", "/patient/profile"),
+      saveProfile: (p: PatientProfileInput) => call<{ profile: PatientProfileInput }>("PUT", "/patient/profile", p),
       physicians: (q: { state: string; specialty: string; ageGroup: string; language?: string }) =>
         call<{ physicians: PhysicianCard[] }>("GET", `/patient/physicians?${new URLSearchParams(q as Record<string, string>)}`),
       createRequest: (b: {
@@ -145,7 +165,6 @@ export function createApi(baseUrl: string, auth: Auth) {
       resumeUploadUrl: () => call<{ uploadUrl: string; contentType: string; maxBytes: number }>("POST", "/physician/resume-upload"),
       signBaa: (version: string) => call<PhysicianSelf>("POST", "/physician/baa", { accept: true, version }),
       payoutsLink: () => call<{ url: string }>("POST", "/physician/payouts"),
-      setPrice: (visitPriceCents: number) => call<{ visitPriceCents: number; bookingFeeCents: number }>("PUT", "/physician/price", { visitPriceCents }),
       setOnline: (online: boolean) => call<{ online: boolean }>("POST", "/physician/online", { online }),
       openRequests: () => call<{ requests: OpenRequest[] }>("GET", "/physician/requests"),
       subscription: () => call<{ url: string }>("POST", "/physician/subscription"),

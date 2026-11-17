@@ -45,3 +45,21 @@ describe("notifications contain no health information", () => {
     });
   }
 });
+
+import { ageOn, dateOfBirth, phone, zip } from "../src/domain/validation.js";
+describe("patient profile validation", () => {
+  it("computes age and requires 18+", () => {
+    expect(ageOn("2000-11-17", "2026-11-16")).toBe(25);
+    expect(ageOn("2000-11-16", "2026-11-16")).toBe(26);
+    expect(() => dateOfBirth("2010-01-01", "2026-11-16")).toThrow(ValidationError);
+    expect(() => dateOfBirth("2030-01-01", "2026-11-16")).toThrow(ValidationError);
+    expect(dateOfBirth("1990-05-04", "2026-11-16")).toBe("1990-05-04");
+  });
+  it("normalizes US phone numbers and checks ZIP codes", () => {
+    expect(phone("(661) 555-0123")).toBe("+16615550123");
+    expect(phone("+16615550123")).toBe("+16615550123");
+    expect(() => phone("12345")).toThrow(ValidationError);
+    expect(zip("91355")).toBe("91355");
+    expect(() => zip("9135")).toThrow(ValidationError);
+  });
+});

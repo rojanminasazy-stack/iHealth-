@@ -68,7 +68,7 @@ export async function authorizeVisit(params: {
       amount: params.quote.totalCents,
       currency: "usd",
       capture_method: "manual",
-      application_fee_amount: params.quote.platformFeeCents,
+      application_fee_amount: params.quote.platformFeeCents > 0 ? params.quote.platformFeeCents : undefined,
       transfer_data: { destination: params.physicianAccountId },
       on_behalf_of: params.physicianAccountId,
       customer: params.customerId,

@@ -131,10 +131,6 @@ export default function RequestScreen() {
           <Small>Visit</Small>
           <Small>{money(r.visitPriceCents)}</Small>
         </Row>
-        <Row style={{ justifyContent: "space-between" }}>
-          <Small>Booking fee</Small>
-          <Small>{money(r.bookingFeeCents)}</Small>
-        </Row>
       </Card>
       <ErrorText>{error}</ErrorText>
       {r.status === "MATCHED" ? <Button title="Cancel visit" variant="ghost" loading={busy} onPress={cancel} /> : null}

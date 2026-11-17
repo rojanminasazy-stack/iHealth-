@@ -84,7 +84,7 @@ function Welcome() {
       <Title>See patients on iHealthé</Title>
       <Card>
         <Small>• Patients in states where you're licensed choose you and pay you directly.</Small>
-        <Small>• You set your own visit price and hours. Go online whenever you want.</Small>
+        <Small>• Focused 20-minute video visits. Go online whenever you want.</Small>
         <Small>• Founding physicians get 90 days free, then $99/month for life.</Small>
       </Card>
       <Button big title="Start application" onPress={() => router.push("/apply")} />
@@ -249,7 +249,6 @@ function Active({ me, reload }: { me: PhysicianSelf; reload: () => Promise<void>
   const [online, setOnline] = useState(me.online);
   const [requests, setRequests] = useState<OpenRequest[]>([]);
   const [visits, setVisits] = useState<PhysicianVisit[]>([]);
-  const [price, setPrice] = useState(String(me.visitPriceCents / 100));
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -315,20 +314,6 @@ function Active({ me, reload }: { me: PhysicianSelf; reload: () => Promise<void>
     }
   };
 
-  const savePrice = async () => {
-    setBusy("price");
-    setError(null);
-    try {
-      await api.physician.setPrice(Math.round(Number(price) * 100));
-      setNotice("Price updated.");
-      await reload();
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setBusy(null);
-    }
-  };
-
   return (
     <>
       <Card style={{ backgroundColor: online ? color.good + "14" : color.surface }}>
@@ -354,8 +339,20 @@ function Active({ me, reload }: { me: PhysicianSelf; reload: () => Promise<void>
                 <Pill text={v.ageGroup === "CHILD" ? "Child" : "Adult"} />
                 <Pill text={`Patient in ${v.patientState}`} />
               </Row>
-              <Body>{v.chiefComplaint}</Body>
-              <Small>Started: {v.symptomDuration} · {specialtyName(v.specialty)}</Small>
+              <Body>{`Reason: ${v.chiefComplaint}`}</Body>
+              <Small>Started: {v.symptomDuration} · {specialtyName(v.specialty)} · {v.visitMinutes}-minute visit</Small>
+              {v.patient ? (
+                <View style={{ gap: 4 }}>
+                  <Label>Patient</Label>
+                  <Small>{`${v.patient.fullName} · ${v.patient.age} years · DOB ${v.patient.dateOfBirth}`}</Small>
+                  <Small>{`Phone ${v.patient.phone} · Lives in ${v.patient.stateOfResidence}`}</Small>
+                  <Small>{`${v.patient.address.line1}${v.patient.address.line2 ? ", " + v.patient.address.line2 : ""}, ${v.patient.address.city}, ${v.patient.address.state} ${v.patient.address.zip}`}</Small>
+                  <Small>{`Health history: ${v.patient.medicalHistory || "None given"}`}</Small>
+                  <Small>{`Medications: ${v.patient.medications || "None given"}`}</Small>
+                  <Small>{`Chronic conditions: ${v.patient.chronicConditions || "None given"}`}</Small>
+                  <Small style={{ color: color.bad, fontWeight: "700" }}>{`Allergies: ${v.patient.allergies || "None given"}`}</Small>
+                </View>
+              ) : null}
               <Notice>{`Confirm with the patient that they are in ${v.patientState} right now before you begin.`}</Notice>
               <Button
                 title={v.status === "IN_VISIT" ? "Rejoin video" : "Start video visit"}
@@ -385,13 +382,6 @@ function Active({ me, reload }: { me: PhysicianSelf; reload: () => Promise<void>
           ))}
         </>
       ) : null}
-
-      <Card>
-        <Heading>Your visit price</Heading>
-        <Field label="Price in USD" value={price} onChangeText={setPrice} keyboardType="decimal-pad" />
-        <Small>Between $25 and $300. Patients see this before booking.</Small>
-        <Button title="Save price" variant="ghost" loading={busy === "price"} onPress={savePrice} />
-      </Card>
 
       <Card>
         <Heading>Your plan</Heading>

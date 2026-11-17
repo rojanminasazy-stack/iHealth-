@@ -11,11 +11,6 @@ const DURATIONS = [
   { code: "Longer", name: "Longer" },
 ] as const;
 
-const WHO = [
-  { code: "ADULT", name: "Me (18+)" },
-  { code: "CHILD", name: "My child" },
-] as const;
-
 const LANGUAGES = [
   { code: "en", name: "English" },
   { code: "es", name: "Spanish" },
@@ -28,7 +23,6 @@ export default function Intake() {
   const [chiefComplaint, setComplaint] = useState(intake?.chiefComplaint ?? "");
   const [symptomDuration, setDuration] = useState<string | undefined>(intake?.symptomDuration);
   const [patientState, setState] = useState<string | undefined>(intake?.patientState);
-  const [ageGroup, setAge] = useState<"ADULT" | "CHILD">(intake?.ageGroup ?? "ADULT");
   const [specialty, setSpecialty] = useState<string>(intake?.specialty ?? "FAMILY_MEDICINE");
   const [language, setLanguage] = useState<string>(intake?.language ?? "en");
   const [error, setError] = useState<string | null>(null);
@@ -37,14 +31,14 @@ export default function Intake() {
     if (chiefComplaint.trim().length < 3) return setError("Tell us a little about what's going on.");
     if (!symptomDuration) return setError("Choose when this started.");
     if (!patientState) return setError("Choose where you are right now.");
-    setIntake({ chiefComplaint: chiefComplaint.trim(), symptomDuration, patientState, ageGroup, specialty, language });
+    setIntake({ chiefComplaint: chiefComplaint.trim(), symptomDuration, patientState, ageGroup: "ADULT", specialty, language });
     router.push("/choose");
   };
 
   return (
     <Screen>
       <Field
-        label="Tell us what you're experiencing"
+        label="Reason for your visit"
         placeholder="Sore throat and fever since yesterday"
         value={chiefComplaint}
         onChangeText={setComplaint}
@@ -56,8 +50,6 @@ export default function Intake() {
       <Label>Where are you physically located right now?</Label>
       <Chips options={STATES} value={patientState as (typeof STATES)[number]["code"] | undefined} onChange={setState} />
       <Notice>Physicians can only see you in states where they're licensed, so this needs to be where you are right now, not your home address.</Notice>
-      <Label>Who is the visit for?</Label>
-      <Chips options={WHO} value={ageGroup} onChange={setAge} />
       <Label>Type of care</Label>
       <Chips options={SPECIALTIES} value={specialty as (typeof SPECIALTIES)[number]["code"]} onChange={setSpecialty} />
       <Label>Preferred language</Label>

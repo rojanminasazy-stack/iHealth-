@@ -124,7 +124,8 @@ export type AuditAction =
   | "PAYMENT_RELEASED"
   | "SUBSCRIPTION_UPDATED"
   | "PROVIDER_LIST_VIEWED"
-  | "INTAKE_VIEWED";
+  | "INTAKE_VIEWED"
+  | "PATIENT_PROFILE_UPDATED";
 
 export type ActorRole = "PATIENT" | "PHYSICIAN" | "STAFF" | "SYSTEM";
 
@@ -135,8 +136,25 @@ export interface AuditEvent {
   actorRole: ActorRole;
   action: AuditAction;
   /** Opaque ids only. Never names, symptoms or other PHI. */
-  resourceType: "PROVIDER" | "CARE_REQUEST" | "PAYMENT";
+  resourceType: "PROVIDER" | "CARE_REQUEST" | "PAYMENT" | "PATIENT";
   resourceId: string;
   result: "ALLOWED" | "DENIED";
   reason?: string;
+}
+
+/** The patient's "About you" answers. Health information: PHI, encrypted at rest, shown only to the matched physician. */
+export interface PatientProfile {
+  userId: string;
+  fullName: string;
+  /** YYYY-MM-DD */
+  dateOfBirth: string;
+  phone: string;
+  address: { line1: string; line2?: string; city: string; state: StateCode; zip: string };
+  stateOfResidence: StateCode;
+  medicalHistory: string;
+  medications: string;
+  chronicConditions: string;
+  allergies: string;
+  createdAt: string;
+  updatedAt: string;
 }

@@ -40,6 +40,26 @@ async function waitForJoin(): Promise<Join> {
   throw new Error("Visit details didn't load. Go back and tap Join again.");
 }
 
+/** 20-minute visit clock. It counts down and turns red in the last 2 minutes; it never cuts the call off mid-sentence. */
+const VISIT_SECONDS = 20 * 60;
+let timerStarted = false;
+function startTimer() {
+  if (timerStarted) return;
+  timerStarted = true;
+  const el = $<HTMLParagraphElement>("timer");
+  const end = Date.now() + VISIT_SECONDS * 1000;
+  el.hidden = false;
+  const tick = () => {
+    const left = Math.round((end - Date.now()) / 1000);
+    const m = Math.floor(Math.abs(left) / 60);
+    const s = String(Math.abs(left) % 60).padStart(2, "0");
+    el.textContent = left >= 0 ? `${m}:${s} left` : `${m}:${s} over`;
+    el.classList.toggle("late", left <= 120);
+  };
+  tick();
+  setInterval(tick, 1000);
+}
+
 async function main() {
   const join = await waitForJoin();
   delete window.__IHEALTHE_JOIN__;
@@ -75,6 +95,7 @@ async function main() {
     audioVideoDidStart: () => {
       show("Waiting for the other person to join…");
       tell("joined");
+      startTimer();
     },
     audioVideoDidStop: (s: MeetingSessionStatus) => {
       const code = s.statusCode();

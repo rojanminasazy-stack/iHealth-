@@ -8,7 +8,7 @@ import { PinpointSMSVoiceV2Client, SendTextMessageCommand } from "@aws-sdk/clien
 export const TEMPLATES = {
   PATIENT_WELCOME: {
     subject: "Welcome to iHealthé",
-    text: "Your iHealthé account is ready. Open the app any time you need a physician.",
+    text: "Welcome to iHealthé! Your account is ready. Whenever you need a physician, open the app and you'll be face to face with one licensed in your state in minutes.",
   },
   REQUEST_RECEIVED: {
     subject: "We got your iHealthé request",

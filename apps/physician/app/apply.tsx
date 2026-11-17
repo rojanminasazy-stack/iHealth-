@@ -41,7 +41,6 @@ export default function Apply() {
   const [specialty, setSpecialty] = useState<string>("FAMILY_MEDICINE");
   const [languages, setLanguages] = useState<string[]>(["en"]);
   const [licenses, setLicenses] = useState<LicenseDraft[]>([{ number: "", expiresOn: "" }]);
-  const [price, setPrice] = useState("79");
   const [peds, setPeds] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -52,8 +51,6 @@ export default function Apply() {
   const submit = async () => {
     setError(null);
     if (licenses.some((l) => !l.state)) return setError("Choose the state for each license.");
-    const dollars = Number(price);
-    if (!Number.isFinite(dollars)) return setError("Enter your visit price in dollars, like 79.");
     setBusy(true);
     try {
       await api.physician.apply({
@@ -63,7 +60,7 @@ export default function Apply() {
         specialty,
         languages,
         licenses: licenses.map((l) => ({ state: l.state!, number: l.number, expiresOn: l.expiresOn.trim() })),
-        visitPriceCents: Math.round(dollars * 100),
+        visitPriceCents: 7900,
         acceptsPediatric: peds,
       });
       router.replace("/");
@@ -107,8 +104,6 @@ export default function Apply() {
       />
       <Small>Selected: {languages.join(", ") || "none"}</Small>
 
-      <Field label="Your visit price (USD)" value={price} onChangeText={setPrice} keyboardType="decimal-pad" />
-      <Small>Between $25 and $300. Patients pay you this directly. iHealthé adds a separate booking fee for the patient.</Small>
       <Row style={{ flexWrap: "nowrap" }}>
         <Switch value={peds} onValueChange={setPeds} accessibilityLabel="I see patients under 18" />
         <Small style={{ flex: 1 }}>I see patients under 18</Small>

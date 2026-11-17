@@ -7,6 +7,7 @@ import { authorizeVisit, releaseVisit } from "../lib/payments.js";
 import { findEligible, isEligible } from "../domain/eligibility.js";
 import { assertRequestTransition } from "../domain/stateMachines.js";
 import { patientVisitView } from "./visit.js";
+import { getPatientProfile } from "./profile.js";
 import { quote } from "../domain/fees.js";
 import * as v from "../domain/validation.js";
 import type { CareRequest } from "../domain/types.js";
@@ -34,7 +35,7 @@ export const listPhysicians = handler(async (e) => {
   const ranked = findEligible(await providersByStatus("ACTIVE"), query, { preferredLanguage: q.language });
   await audit({ actorId: c.userId, actorRole: "PATIENT", action: "PROVIDER_LIST_VIEWED", resourceType: "PROVIDER", resourceId: `list:${query.patientState}`, result: "ALLOWED" });
   return json(200, {
-    physicians: ranked.slice(0, 50).map((p) => ({ ...publicProfile(p), quote: quote(p.visitPriceCents) })),
+    physicians: ranked.slice(0, 50).map((p) => ({ ...publicProfile(p), quote: quote() })),
   });
 });
 
@@ -50,14 +51,16 @@ export const createRequest = handler(async (e) => {
   if (b.emergencyAcknowledged !== true) {
     throw new v.ValidationError("Please confirm this is not an emergency. If it is, call 911.");
   }
+  const profile = await getPatientProfile(c.userId);
+  if (!profile) throw new HttpError(409, "Please finish the About you questions first.");
   const patientState = v.state(b.patientState, "Your current location");
-  const ageGroup = v.ageGroup(b.ageGroup);
+  const ageGroup = "ADULT" as const; // accounts are 18+; derived from date of birth on the profile
   const specialty = v.specialty(b.specialty);
   const provider = await getProvider(v.str(b.providerId, "Physician", 60));
   if (!provider || !isEligible(provider, { patientState, ageGroup, specialty, today: todayIso() })) {
     throw new HttpError(409, "That physician isn't available for you right now. Pick another one.");
   }
-  const priced = quote(provider.visitPriceCents);
+  const priced = quote();
   const at = nowIso();
   const r: CareRequest = {
     requestId: newId("req"),
@@ -65,13 +68,13 @@ export const createRequest = handler(async (e) => {
     patientState,
     ageGroup,
     specialty,
-    chiefComplaint: v.str(b.chiefComplaint, "What's going on", 500),
+    chiefComplaint: v.str(b.chiefComplaint, "Reason for your visit", 500),
     symptomDuration: v.str(b.symptomDuration, "When it started", 40),
     requestedProviderId: provider.providerId,
     status: "REQUESTED",
     visitPriceCents: priced.visitPriceCents,
     bookingFeeCents: priced.bookingFeeCents,
-    patientContact: { email: claim(e, "email"), phone: claim(e, "phone_number") },
+    patientContact: { email: claim(e, "email"), phone: claim(e, "phone_number") ?? profile.phone },
     createdAt: at,
     updatedAt: at,
     expiresAt: Math.floor(Date.now() / 1000) + REQUEST_TTL_SECONDS,

@@ -22,6 +22,9 @@ export const tables = {
   get audit() {
     return env("AUDIT_TABLE");
   },
+  get patients() {
+    return env("PATIENTS_TABLE");
+  },
   get counters() {
     return env("COUNTERS_TABLE");
   },
