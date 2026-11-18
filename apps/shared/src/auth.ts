@@ -6,7 +6,7 @@ import {
   type CognitoUserSession,
   type ICognitoStorage,
 } from "amazon-cognito-identity-js";
-import * as SecureStore from "expo-secure-store";
+import { secureStore } from "./secureStore";
 
 /**
  * Tokens live in the iOS Keychain / Android Keystore via expo-secure-store,
@@ -21,18 +21,18 @@ class SecureStorage implements ICognitoStorage {
   }
   private safe = (k: string) => `${this.prefix}.${k.replace(/[^A-Za-z0-9._-]/g, "_")}`;
   async hydrate() {
-    const idx = await SecureStore.getItemAsync(this.indexKey);
+    const idx = await secureStore.get(this.indexKey);
     for (const k of idx ? (JSON.parse(idx) as string[]) : []) {
-      const v = await SecureStore.getItemAsync(this.safe(k));
+      const v = await secureStore.get(this.safe(k));
       if (v != null) this.mem.set(k, v);
     }
   }
   private persistIndex() {
-    void SecureStore.setItemAsync(this.indexKey, JSON.stringify([...this.mem.keys()]));
+    void secureStore.set(this.indexKey, JSON.stringify([...this.mem.keys()]));
   }
   setItem(k: string, v: string) {
     this.mem.set(k, v);
-    void SecureStore.setItemAsync(this.safe(k), v, { keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY });
+    void secureStore.set(this.safe(k), v);
     this.persistIndex();
     return v;
   }
@@ -41,7 +41,7 @@ class SecureStorage implements ICognitoStorage {
   }
   removeItem(k: string) {
     this.mem.delete(k);
-    void SecureStore.deleteItemAsync(this.safe(k));
+    void secureStore.remove(this.safe(k));
     this.persistIndex();
     return true;
   }
@@ -84,14 +84,20 @@ export function friendlyAuthError(err: unknown): string {
 }
 
 export class Auth {
-  private pool: CognitoUserPool;
+  private _pool?: CognitoUserPool;
   private storage: SecureStorage;
   private ready: Promise<void>;
 
-  constructor(cfg: { userPoolId: string; clientId: string; storagePrefix: string }) {
+  constructor(private cfg: { userPoolId: string; clientId: string; storagePrefix: string }) {
     this.storage = new SecureStorage(cfg.storagePrefix);
-    this.pool = new CognitoUserPool({ UserPoolId: cfg.userPoolId, ClientId: cfg.clientId, Storage: this.storage });
     this.ready = this.storage.hydrate();
+  }
+
+  /** Created on first use, so the app can show "opening soon" before sign-in is configured. */
+  private get pool(): CognitoUserPool {
+    if (!this.cfg.userPoolId || !this.cfg.clientId) throw new Error("Sign-in isn't switched on yet.");
+    this._pool ??= new CognitoUserPool({ UserPoolId: this.cfg.userPoolId, ClientId: this.cfg.clientId, Storage: this.storage });
+    return this._pool;
   }
 
   private user(email: string) {

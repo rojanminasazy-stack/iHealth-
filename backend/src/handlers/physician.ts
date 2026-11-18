@@ -1,4 +1,5 @@
-import { PutCommand, UpdateCommand, QueryCommand, GetCommand } from "@aws-sdk/lib-dynamodb";
+import { PutCommand, UpdateCommand, QueryCommand, GetCommand, TransactWriteCommand } from "@aws-sdk/lib-dynamodb";
+import { canOffer, secondsLeft } from "../domain/dispatch.js";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { body, caller, handler, HttpError, json, type Event } from "../lib/http.js";
@@ -193,7 +194,7 @@ export const setOnline = handler(async (e) => {
     new UpdateCommand({
       TableName: tables.providers,
       Key: { providerId: p.providerId },
-      UpdateExpression: "SET online = :o, updatedAt = :at",
+      UpdateExpression: "SET online = :o, lastSeenAt = :at, updatedAt = :at",
       ExpressionAttributeValues: { ":o": online, ":at": nowIso() },
     }),
   );
@@ -202,13 +203,26 @@ export const setOnline = handler(async (e) => {
 });
 
 /**
- * GET /physician/requests — open requests this physician may take.
- * Shows only what's needed to decide: age group, specialty, short complaint, state, pay.
+ * GET /physician/requests — Uber-style incoming requests. The app calls this every 5 seconds while
+ * online; each call also counts as a check-in, so a physician whose app closed stops getting offers.
+ * Shows only what's needed to decide (minimum necessary): age group, care type, short reason, state.
  */
 export const openRequests = handler(async (e) => {
   const p = await requireProviderForUser(caller(e, "PHYSICIAN").userId);
-  if (p.status !== "ACTIVE" || !p.online) return json(200, { requests: [] });
-  const states = p.licenses.filter((l) => l.verifiedAt && l.expiresOn >= todayIso()).map((l) => l.state);
+  if (p.status !== "ACTIVE" || !p.online) return json(200, { requests: [], busy: !!p.busyWith });
+  const seen = nowIso();
+  await ddb.send(
+    new UpdateCommand({
+      TableName: tables.providers,
+      Key: { providerId: p.providerId },
+      UpdateExpression: "SET lastSeenAt = :t",
+      ExpressionAttributeValues: { ":t": seen },
+    }),
+  );
+  const me = { ...p, lastSeenAt: seen };
+  const now = Date.now();
+  const today = todayIso();
+  const states = p.licenses.filter((l) => l.verifiedAt && l.expiresOn >= today).map((l) => l.state);
   const out: unknown[] = [];
   for (const st of states) {
     const r = await ddb.send(
@@ -221,8 +235,7 @@ export const openRequests = handler(async (e) => {
       }),
     );
     for (const item of (r.Items ?? []) as CareRequest[]) {
-      if (item.requestedProviderId !== p.providerId) continue;
-      if (!isEligible(p, { patientState: item.patientState, ageGroup: item.ageGroup, specialty: item.specialty, today: todayIso() })) continue;
+      if (!canOffer(me, item, today, now)) continue;
       out.push({
         requestId: item.requestId,
         ageGroup: item.ageGroup,
@@ -230,17 +243,21 @@ export const openRequests = handler(async (e) => {
         patientState: item.patientState,
         chiefComplaint: item.chiefComplaint.slice(0, 80),
         symptomDuration: item.symptomDuration,
-        youReceiveCents: p.visitPriceCents,
+        chosenYou: item.requestedProviderId === p.providerId,
+        youReceiveCents: item.visitPriceCents ?? FEES.visitPriceCents,
+        visitMinutes: FEES.visitMinutes,
+        secondsLeft: secondsLeft(item, now),
         createdAt: item.createdAt,
       });
     }
   }
-  return json(200, { requests: out });
+  return json(200, { requests: out, busy: !!p.busyWith });
 });
 
 /**
- * POST /physician/requests/{id}/accept — atomic. Re-checks eligibility on the server,
- * then a conditional write guarantees only one physician wins.
+ * POST /physician/requests/{id}/accept — first to accept wins. Re-checks everything on the server,
+ * then one database transaction both claims the request and marks the physician busy, so neither
+ * two physicians nor one physician twice can accept at once.
  */
 export const accept = handler(async (e) => {
   const c = caller(e, "PHYSICIAN");
@@ -251,35 +268,74 @@ export const accept = handler(async (e) => {
   const r = got.Item as CareRequest | undefined;
   if (!r) throw new HttpError(404, "That request no longer exists.");
 
-  const ok = isEligible(p, { patientState: r.patientState, ageGroup: r.ageGroup, specialty: r.specialty, today: todayIso() }) &&
-    r.requestedProviderId === p.providerId;
-  if (!ok) {
-    await audit({ actorId: c.userId, actorRole: "PHYSICIAN", action: "CARE_REQUEST_ACCEPT_REJECTED", resourceType: "CARE_REQUEST", resourceId: requestId, result: "DENIED", reason: "not eligible" });
-    throw new HttpError(403, "You're not eligible to accept this request.");
+  if (!canOffer({ ...p, lastSeenAt: nowIso() }, r, todayIso(), Date.now())) {
+    await audit({ actorId: c.userId, actorRole: "PHYSICIAN", action: "CARE_REQUEST_ACCEPT_REJECTED", resourceType: "CARE_REQUEST", resourceId: requestId, result: "DENIED", reason: "not eligible or no longer open" });
+    throw new HttpError(409, "This request is no longer available.");
   }
 
   const at = nowIso();
   try {
     await ddb.send(
-      new UpdateCommand({
-        TableName: tables.requests,
-        Key: { requestId },
-        UpdateExpression: "SET #s = :matched, matchedProviderId = :p, activeProviderId = :p, updatedAt = :at REMOVE openState",
-        // Only a paid-for, still-open request can be accepted.
-        ConditionExpression: "#s = :offered AND attribute_exists(openState)",
-        ExpressionAttributeNames: { "#s": "status" },
-        ExpressionAttributeValues: { ":matched": "MATCHED", ":p": p.providerId, ":at": at, ":offered": "OFFERED" },
+      new TransactWriteCommand({
+        TransactItems: [
+          {
+            Update: {
+              TableName: tables.requests,
+              Key: { requestId },
+              UpdateExpression: "SET #s = :matched, matchedProviderId = :p, activeProviderId = :p, updatedAt = :at REMOVE openState",
+              ConditionExpression: "#s = :offered AND attribute_exists(openState)",
+              ExpressionAttributeNames: { "#s": "status" },
+              ExpressionAttributeValues: { ":matched": "MATCHED", ":p": p.providerId, ":at": at, ":offered": "OFFERED" },
+            },
+          },
+          {
+            Update: {
+              TableName: tables.providers,
+              Key: { providerId: p.providerId },
+              UpdateExpression: "SET busyWith = :r, updatedAt = :at",
+              ConditionExpression: "attribute_not_exists(busyWith) AND online = :t",
+              ExpressionAttributeValues: { ":r": requestId, ":at": at, ":t": true },
+            },
+          },
+        ],
       }),
     );
   } catch (err) {
-    if ((err as { name?: string }).name === "ConditionalCheckFailedException") {
-      throw new HttpError(409, "Another physician already accepted this request.");
+    if ((err as { name?: string }).name === "TransactionCanceledException") {
+      throw new HttpError(409, "Another physician just accepted this patient.");
     }
     throw err;
   }
   await audit({ actorId: c.userId, actorRole: "PHYSICIAN", action: "CARE_REQUEST_ACCEPTED", resourceType: "CARE_REQUEST", resourceId: requestId, result: "ALLOWED" });
   await notify(r.patientContact, "VISIT_CONFIRMED");
   return json(200, { requestId, status: "MATCHED" });
+});
+
+/**
+ * POST /physician/requests/{id}/decline — pass on a request. It's never offered to you again.
+ * If the patient had chosen you, the request goes to every other available physician instead.
+ */
+export const decline = handler(async (e) => {
+  const c = caller(e, "PHYSICIAN");
+  const p = await requireProviderForUser(c.userId);
+  const requestId = e.pathParameters?.id;
+  if (!requestId) throw new HttpError(400, "Missing request id.");
+  try {
+    await ddb.send(
+      new UpdateCommand({
+        TableName: tables.requests,
+        Key: { requestId },
+        UpdateExpression: "SET declinedBy = list_append(if_not_exists(declinedBy, :empty), :me), updatedAt = :at REMOVE requestedProviderId",
+        ConditionExpression: "#s = :offered AND (attribute_not_exists(requestedProviderId) OR requestedProviderId = :pid)",
+        ExpressionAttributeNames: { "#s": "status" },
+        ExpressionAttributeValues: { ":empty": [], ":me": [p.providerId], ":at": nowIso(), ":offered": "OFFERED", ":pid": p.providerId },
+      }),
+    );
+  } catch (err) {
+    if ((err as { name?: string }).name !== "ConditionalCheckFailedException") throw err;
+  }
+  await audit({ actorId: c.userId, actorRole: "PHYSICIAN", action: "CARE_REQUEST_DECLINED", resourceType: "CARE_REQUEST", resourceId: requestId, result: "ALLOWED" });
+  return json(200, { requestId, declined: true });
 });
 
 /** POST /physician/subscription — Stripe Checkout for the monthly iHealthé Pro subscription. */

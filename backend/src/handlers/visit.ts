@@ -3,7 +3,7 @@ import { body, caller, handler, HttpError, json, type Event } from "../lib/http.
 import { ddb, nowIso, tables } from "../lib/db.js";
 import { audit } from "../lib/audit.js";
 import { notify } from "../lib/notify.js";
-import { getProvider, publicProfile, requireProviderForUser } from "../lib/providers.js";
+import { freeProvider, getProvider, publicProfile, requireProviderForUser } from "../lib/providers.js";
 import { addAttendee, endMeeting, ensureMeeting } from "../lib/video.js";
 import { captureVisit } from "../lib/payments.js";
 import { assertRequestTransition } from "../domain/stateMachines.js";
@@ -164,8 +164,10 @@ export const complete = handler(async (e) => {
   );
   await audit({ actorId: c.userId, actorRole: "PHYSICIAN", action: "VISIT_COMPLETED", resourceType: "CARE_REQUEST", resourceId: r.requestId, result: "ALLOWED" });
   if (r.meetingId) await endMeeting(r.meetingId);
+  await freeProvider(p.providerId, r.requestId);
   if (r.paymentIntentId) {
-    await captureVisit(r.paymentIntentId);
+    if (!p.stripeAccountId) throw new HttpError(409, "Your payout account isn't set up, so we can't pay you for this visit. Contact iHealthé support.");
+    await captureVisit({ paymentIntentId: r.paymentIntentId, physicianAccountId: p.stripeAccountId, physicianReceivesCents: r.visitPriceCents ?? FEES.visitPriceCents, requestId: r.requestId });
     await audit({ actorId: "system", actorRole: "SYSTEM", action: "PAYMENT_CAPTURED", resourceType: "PAYMENT", resourceId: r.requestId, result: "ALLOWED" });
   }
   await notify(r.patientContact, "VISIT_RECEIPT");

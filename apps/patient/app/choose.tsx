@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Switch, View } from "react-native";
 import { router } from "expo-router";
-import { useStripe } from "@stripe/stripe-react-native";
 import {
   Body,
   Button,
@@ -20,10 +19,17 @@ import {
   type PhysicianCard,
 } from "@ihealthe/shared";
 import { api, useIntake } from "../lib/session";
+import { CLIENT, usePay } from "../lib/pay";
 
+const LANG: Record<string, string> = { en: "English", es: "Spanish", fa: "Farsi", zh: "Chinese" };
+
+/**
+ * Uber-style: the default is "match me with the first available doctor".
+ * Patients can still pick a specific doctor who's online right now.
+ */
 export default function Choose() {
   const { intake } = useIntake();
-  const { initPaymentSheet, presentPaymentSheet } = useStripe();
+  const pay = usePay();
   const [list, setList] = useState<PhysicianCard[] | null>(null);
   const [picked, setPicked] = useState<PhysicianCard | null>(null);
   const [notEmergency, setNotEmergency] = useState(false);
@@ -41,14 +47,18 @@ export default function Choose() {
         language: intake.language ?? "en",
       });
       setList(r.physicians);
+      setPicked((p) => (p && r.physicians.some((x) => x.providerId === p.providerId) ? p : null));
     } catch (e) {
       setError((e as Error).message);
       setList([]);
     }
   }, [intake]);
 
+  // Like a ride app's map: refresh who's online every 15 seconds.
   useEffect(() => {
     void load();
+    const t = setInterval(load, 15_000);
+    return () => clearInterval(t);
   }, [load]);
 
   if (!intake) {
@@ -56,13 +66,16 @@ export default function Choose() {
     return null;
   }
 
-  const book = async () => {
-    if (!picked) return;
+  const price = list?.[0]?.quote.totalCents ?? 7_900;
+  const online = list?.length ?? 0;
+
+  const request = async () => {
     setBusy(true);
     setError(null);
     try {
       const created = await api.patient.createRequest({
-        providerId: picked.providerId,
+        providerId: picked?.providerId,
+        client: CLIENT,
         patientState: intake.patientState,
         ageGroup: intake.ageGroup,
         specialty: intake.specialty,
@@ -70,18 +83,10 @@ export default function Choose() {
         symptomDuration: intake.symptomDuration,
         emergencyAcknowledged: true,
       });
-      const init = await initPaymentSheet({
-        merchantDisplayName: "iHealthé",
-        paymentIntentClientSecret: created.paymentClientSecret,
-        applePay: { merchantCountryCode: "US" },
-        googlePay: { merchantCountryCode: "US", testEnv: __DEV__ },
-      });
-      if (init.error) throw new Error(init.error.message);
-      const paid = await presentPaymentSheet();
-      if (paid.error) {
-        // Patient closed the sheet or the card failed: release the request.
+      const result = await pay(created);
+      if (result === "redirected") return; // website: Stripe brings the patient back to the request page
+      if (result === "cancelled") {
         await api.patient.cancel(created.requestId).catch(() => {});
-        if (paid.error.code !== "Canceled") setError(paid.error.message);
         return;
       }
       router.replace({ pathname: "/request/[id]", params: { id: created.requestId } });
@@ -94,20 +99,32 @@ export default function Choose() {
 
   return (
     <View style={{ flex: 1 }}>
-      <ScrollView
-        contentContainerStyle={{ padding: space.lg, gap: space.md }}
-        refreshControl={<RefreshControl refreshing={false} onRefresh={load} />}
-      >
-        <Small>
-          Licensed in {intake.patientState} · {specialtyName(intake.specialty)} · 20-minute video visit
-        </Small>
-        {list === null ? <ActivityIndicator color={color.navy} /> : null}
-        {list?.length === 0 && !error ? (
-          <Card>
-            <Heading>No physicians online right now</Heading>
-            <Body>Nobody licensed in {intake.patientState} for this type of care is available at the moment. Pull down to refresh, or try again soon.</Body>
+      <ScrollView contentContainerStyle={{ padding: space.lg, gap: space.md }} refreshControl={<RefreshControl refreshing={false} onRefresh={load} />}>
+        <Card style={{ backgroundColor: color.navy, borderColor: color.navy }}>
+          <Label>Available now</Label>
+          {list === null ? (
+            <ActivityIndicator color={color.white} />
+          ) : (
+            <Heading>
+              <Body style={{ color: color.white, fontSize: 22, fontWeight: "700" }}>
+                {online === 0 ? `No doctors online in ${intake.patientState} right now` : `${online} doctor${online === 1 ? "" : "s"} online in ${intake.patientState}`}
+              </Body>
+            </Heading>
+          )}
+          <Small style={{ color: "#D4DDEF" }}>{`${specialtyName(intake.specialty)} · 20-minute video visit · ${money(price)}`}</Small>
+        </Card>
+
+        <Pressable onPress={() => setPicked(null)} accessibilityRole="radio" accessibilityState={{ selected: picked === null }}>
+          <Card style={picked === null ? { borderColor: color.navy, borderWidth: 2 } : undefined}>
+            <Row style={{ justifyContent: "space-between" }}>
+              <Heading>First available doctor</Heading>
+              <Pill tone="good" text="FASTEST" />
+            </Row>
+            <Small>We'll connect you with the first verified doctor licensed in your state who accepts.</Small>
           </Card>
-        ) : null}
+        </Pressable>
+
+        {online > 0 ? <Label>Or choose a doctor</Label> : null}
         {list?.map((p) => {
           const on = picked?.providerId === p.providerId;
           return (
@@ -115,44 +132,33 @@ export default function Choose() {
               <Card style={on ? { borderColor: color.navy, borderWidth: 2 } : undefined}>
                 <Row style={{ justifyContent: "space-between" }}>
                   <Heading>{p.name}</Heading>
-                  <Body style={{ fontWeight: "700", color: color.navy }}>{money(p.quote.totalCents)}</Body>
+                  {p.rating ? <Pill text={`★ ${p.rating.toFixed(1)}`} /> : null}
                 </Row>
                 <Row>
                   <Pill tone="good" text="LICENSE VERIFIED" />
                   <Pill text={specialtyName(p.specialty)} />
-                  {p.rating ? <Pill text={`★ ${p.rating.toFixed(1)}`} /> : null}
                 </Row>
-                <Small>Speaks {p.languages.map((l) => ({ en: "English", es: "Spanish", fa: "Farsi", zh: "Chinese" })[l] ?? l).join(", ")}</Small>
+                <Small>Speaks {p.languages.map((l) => LANG[l] ?? l).join(", ")}</Small>
               </Card>
             </Pressable>
           );
         })}
+        {online === 0 && list !== null ? <Notice>Doctors come online throughout the day. Pull down to refresh, or try again in a few minutes.</Notice> : null}
       </ScrollView>
 
-      {picked ? (
-        <View style={{ padding: space.lg, gap: space.md, backgroundColor: color.surface, borderTopWidth: 1, borderColor: color.line }}>
-          <Label>Your total</Label>
-          <Row style={{ justifyContent: "space-between" }}>
-            <Small>20-minute visit with {picked.name}</Small>
-            <Small>{money(picked.quote.visitPriceCents)}</Small>
-          </Row>
-          <Row style={{ justifyContent: "space-between" }}>
-            <Body style={{ fontWeight: "700" }}>Total</Body>
-            <Body style={{ fontWeight: "700" }}>{money(picked.quote.totalCents)}</Body>
-          </Row>
-          <Row style={{ flexWrap: "nowrap" }}>
-            <Switch value={notEmergency} onValueChange={setNotEmergency} accessibilityLabel="This is not an emergency" />
-            <Small style={{ flex: 1 }}>This is not an emergency. If it were, I would call 911.</Small>
-          </Row>
-          <Notice>Your card is held now and charged only after your visit.</Notice>
-          <ErrorText>{error}</ErrorText>
-          <Button title={`Request ${picked.name.split(",")[0]}`} loading={busy} disabled={!notEmergency} onPress={book} />
-        </View>
-      ) : (
-        <View style={{ padding: space.lg }}>
-          <ErrorText>{error}</ErrorText>
-        </View>
-      )}
+      <View style={{ padding: space.lg, gap: space.md, backgroundColor: color.surface, borderTopWidth: 1, borderColor: color.line }}>
+        <Row style={{ justifyContent: "space-between" }}>
+          <Body style={{ fontWeight: "700" }}>{picked ? picked.name : "First available doctor"}</Body>
+          <Body style={{ fontWeight: "700" }}>{money(price)}</Body>
+        </Row>
+        <Row style={{ flexWrap: "nowrap" }}>
+          <Switch value={notEmergency} onValueChange={setNotEmergency} accessibilityLabel="This is not an emergency" />
+          <Small style={{ flex: 1 }}>This is not an emergency. If it were, I would call 911.</Small>
+        </Row>
+        <Small>Your card is held now and charged only after your visit. If no doctor accepts, the hold is released.</Small>
+        <ErrorText>{error}</ErrorText>
+        <Button big title={picked ? `Request ${picked.name.split(",")[0]}` : "Find my doctor"} loading={busy} disabled={!notEmergency || online === 0} onPress={request} />
+      </View>
     </View>
   );
 }

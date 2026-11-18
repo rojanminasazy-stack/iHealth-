@@ -8,8 +8,9 @@ import { api } from "../../lib/session";
  * "Finish visit" asks for a short summary for the patient, then charges the patient's card and sends the receipt.
  */
 export default function PhysicianVisit() {
-  const { id } = useLocalSearchParams<{ id: string }>();
-  const [inCall, setInCall] = useState(true);
+  const { id, after } = useLocalSearchParams<{ id: string; after?: string }>();
+  // On the website, the video page sends you back here with ?after=1 when you leave the call.
+  const [inCall, setInCall] = useState(after !== "1");
   const [summary, setSummary] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);

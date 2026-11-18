@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { ActivityIndicator, RefreshControl, ScrollView, Switch, View } from "react-native";
+import { ActivityIndicator, RefreshControl, ScrollView, Switch, Vibration, View } from "react-native";
 import { router, useFocusEffect } from "expo-router";
 import * as DocumentPicker from "expo-document-picker";
 import * as WebBrowser from "expo-web-browser";
@@ -248,6 +248,7 @@ function NextSteps({ me, reload }: { me: PhysicianSelf; reload: () => Promise<vo
 function Active({ me, reload }: { me: PhysicianSelf; reload: () => Promise<void> }) {
   const [online, setOnline] = useState(me.online);
   const [requests, setRequests] = useState<OpenRequest[]>([]);
+  const [busyInVisit, setBusyInVisit] = useState(false);
   const [visits, setVisits] = useState<PhysicianVisit[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -270,7 +271,13 @@ function Active({ me, reload }: { me: PhysicianSelf; reload: () => Promise<void>
 
   const poll = useCallback(async () => {
     try {
-      setRequests((await api.physician.openRequests()).requests);
+      const res = await api.physician.openRequests();
+      setBusyInVisit(res.busy);
+      setRequests((prev) => {
+        // Buzz on a brand-new request, like a ride app (no-op on the website).
+        if (res.requests.some((x) => !prev.some((p) => p.requestId === x.requestId))) Vibration.vibrate(400);
+        return res.requests;
+      });
     } catch {
       /* keep the last list; the next poll will retry */
     }
@@ -298,6 +305,11 @@ function Active({ me, reload }: { me: PhysicianSelf; reload: () => Promise<void>
     }
   };
 
+  const decline = async (id: string) => {
+    setRequests((rs) => rs.filter((r) => r.requestId !== id));
+    await api.physician.decline(id).catch(() => {});
+  };
+
   const accept = async (id: string) => {
     setBusy(id);
     setError(null);
@@ -320,7 +332,7 @@ function Active({ me, reload }: { me: PhysicianSelf; reload: () => Promise<void>
         <Row style={{ justifyContent: "space-between", flexWrap: "nowrap" }}>
           <View style={{ flex: 1 }}>
             <Heading>{online ? "You're online" : "You're offline"}</Heading>
-            <Small>{online ? "Patients can find and request you." : "Go online to receive patient requests."}</Small>
+            <Small>{online ? "Patients in your licensed states can be matched with you." : "Go online when you're free to see patients."}</Small>
           </View>
           <Switch value={online} onValueChange={toggle} accessibilityLabel="Online" />
         </Row>
@@ -365,19 +377,33 @@ function Active({ me, reload }: { me: PhysicianSelf; reload: () => Promise<void>
 
       {online ? (
         <>
-          <Label>Patient requests</Label>
-          {requests.length === 0 ? <Small>No requests yet. New ones appear here automatically.</Small> : null}
-          {requests.map((r) => (
-            <Card key={r.requestId}>
-              <Row>
-                <Pill text="NEW REQUEST" />
-                <Pill text={r.ageGroup === "CHILD" ? "Child" : "Adult"} />
-                <Pill text={`Patient in ${r.patientState}`} />
+          <Label>Incoming patients</Label>
+          {busyInVisit ? <Notice>You're in a visit. New patients will appear when you finish it.</Notice> : null}
+          {requests.length === 0 && !busyInVisit ? (
+            <Card>
+              <Row style={{ flexWrap: "nowrap" }}>
+                <ActivityIndicator color={color.navy} />
+                <Small style={{ flex: 1 }}>Waiting for patients in your licensed states. Keep this screen open. New requests pop up here.</Small>
               </Row>
-              <Body>{r.chiefComplaint}</Body>
-              <Small>Started: {r.symptomDuration} · {specialtyName(r.specialty)} · Video</Small>
-              <Small>You receive {money(r.youReceiveCents)}</Small>
-              <Button title="Accept" loading={busy === r.requestId} onPress={() => accept(r.requestId)} />
+            </Card>
+          ) : null}
+          {requests.map((r) => (
+            <Card key={r.requestId} style={{ borderColor: color.navy, borderWidth: 2 }}>
+              <Row style={{ justifyContent: "space-between" }}>
+                <Pill tone="good" text={r.chosenYou ? "PATIENT CHOSE YOU" : "NEW PATIENT"} />
+                <Small style={{ fontWeight: "700", color: r.secondsLeft < 60 ? color.bad : color.ink }}>{`${Math.floor(r.secondsLeft / 60)}:${String(r.secondsLeft % 60).padStart(2, "0")} left`}</Small>
+              </Row>
+              <Heading>{r.chiefComplaint}</Heading>
+              <Small>{`${r.ageGroup === "CHILD" ? "Child" : "Adult"} · Patient in ${r.patientState} · Started ${r.symptomDuration}`}</Small>
+              <Small>{`${specialtyName(r.specialty)} · ${r.visitMinutes}-minute video visit · You receive ${money(r.youReceiveCents)}`}</Small>
+              <Row style={{ flexWrap: "nowrap" }}>
+                <View style={{ flex: 2 }}>
+                  <Button big title="Accept" loading={busy === r.requestId} onPress={() => accept(r.requestId)} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Button title="Decline" variant="ghost" onPress={() => decline(r.requestId)} />
+                </View>
+              </Row>
             </Card>
           ))}
         </>

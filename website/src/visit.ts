@@ -26,13 +26,40 @@ declare global {
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const statusEl = $<HTMLParagraphElement>("status");
-const tell = (m: string) => window.ReactNativeWebView?.postMessage(m);
+const tell = (m: string) => {
+  window.ReactNativeWebView?.postMessage(m);
+  if (!window.ReactNativeWebView && (m === "left" || m === "ended")) goBack();
+};
 const show = (m: string | null) => {
   statusEl.textContent = m ?? "";
   statusEl.hidden = !m;
 };
 
+/** Website visits: the web app leaves the join details in this tab's sessionStorage. */
+const returnTo = (() => {
+  try {
+    return sessionStorage.getItem("ihealthe.return");
+  } catch {
+    return null;
+  }
+})();
+function takeWebJoin(): Join | undefined {
+  try {
+    const raw = sessionStorage.getItem("ihealthe.join");
+    if (!raw) return undefined;
+    sessionStorage.removeItem("ihealthe.join");
+    return JSON.parse(raw) as Join;
+  } catch {
+    return undefined;
+  }
+}
+const goBack = () => {
+  if (returnTo && returnTo.startsWith("/")) setTimeout(() => window.location.assign(returnTo), 800);
+};
+
 async function waitForJoin(): Promise<Join> {
+  const web = takeWebJoin();
+  if (web) return web;
   for (let i = 0; i < 100; i++) {
     if (window.__IHEALTHE_JOIN__) return window.__IHEALTHE_JOIN__;
     await new Promise((r) => setTimeout(r, 100));

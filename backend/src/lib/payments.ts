@@ -53,13 +53,13 @@ export async function onboardingLink(accountId: string, returnUrl: string, refre
 }
 
 /**
- * One charge to the patient. The visit price goes to the physician's account,
- * iHealthé keeps only the flat booking fee. Authorized now, captured when the visit completes.
+ * Uber-style payments: the patient's card is held when they request a visit, before we know which
+ * physician will accept. We use Stripe "separate charges and transfers": the hold sits with iHealthé,
+ * and when the visit ends we capture it and transfer the full visit price to the physician who saw them.
  * Metadata holds opaque ids only. No PHI goes to Stripe.
  */
 export async function authorizeVisit(params: {
   quote: Quote;
-  physicianAccountId: string;
   requestId: string;
   customerId?: string;
 }): Promise<{ paymentIntentId: string; clientSecret: string }> {
@@ -68,9 +68,7 @@ export async function authorizeVisit(params: {
       amount: params.quote.totalCents,
       currency: "usd",
       capture_method: "manual",
-      application_fee_amount: params.quote.platformFeeCents > 0 ? params.quote.platformFeeCents : undefined,
-      transfer_data: { destination: params.physicianAccountId },
-      on_behalf_of: params.physicianAccountId,
+      transfer_group: params.requestId,
       customer: params.customerId,
       description: "iHealthé visit",
       metadata: { request_id: params.requestId },
@@ -82,17 +80,47 @@ export async function authorizeVisit(params: {
   return { paymentIntentId: pi.id, clientSecret: pi.client_secret };
 }
 
-/** Verifies a Stripe webhook signature. Throws if the payload wasn't sent by Stripe. */
-export async function verifyWebhook(rawBody: string, signature: string): Promise<Stripe.Event> {
-  const { webhookSecret } = await stripeKeys();
-  if (!webhookSecret) throw new Error("Stripe webhook secret not configured");
-  return (await stripeClient()).webhooks.constructEvent(rawBody, signature, webhookSecret);
+/** Web version: a Stripe-hosted checkout page that places the same hold. */
+export async function checkoutVisit(params: { quote: Quote; requestId: string; email?: string; returnUrl: string }): Promise<string> {
+  const session = await (await stripeClient()).checkout.sessions.create(
+    {
+      mode: "payment",
+      customer_email: params.email,
+      line_items: [
+        { quantity: 1, price_data: { currency: "usd", unit_amount: params.quote.totalCents, product_data: { name: "iHealthé video visit (20 minutes)" } } },
+      ],
+      payment_intent_data: {
+        capture_method: "manual",
+        transfer_group: params.requestId,
+        description: "iHealthé visit",
+        metadata: { request_id: params.requestId },
+      },
+      metadata: { request_id: params.requestId },
+      success_url: `${params.returnUrl}?paid=1`,
+      cancel_url: `${params.returnUrl}?paid=0`,
+    },
+    { idempotencyKey: `checkout_${params.requestId}` },
+  );
+  if (!session.url) throw new Error("Stripe returned no checkout URL");
+  return session.url;
 }
 
-export async function captureVisit(paymentIntentId: string): Promise<void> {
-  await (await stripeClient()).paymentIntents.capture(paymentIntentId, undefined, {
-    idempotencyKey: `capture_${paymentIntentId}`,
-  });
+/** Charge the held card and pay the physician who did the visit. */
+export async function captureVisit(params: { paymentIntentId: string; physicianAccountId: string; physicianReceivesCents: number; requestId: string }): Promise<void> {
+  const stripe = await stripeClient();
+  const pi = await stripe.paymentIntents.capture(params.paymentIntentId, undefined, { idempotencyKey: `capture_${params.paymentIntentId}` });
+  const charge = typeof pi.latest_charge === "string" ? pi.latest_charge : pi.latest_charge?.id;
+  await stripe.transfers.create(
+    {
+      amount: params.physicianReceivesCents,
+      currency: "usd",
+      destination: params.physicianAccountId,
+      transfer_group: params.requestId,
+      source_transaction: charge,
+      metadata: { request_id: params.requestId },
+    },
+    { idempotencyKey: `transfer_${params.requestId}` },
+  );
 }
 
 export async function releaseVisit(paymentIntentId: string): Promise<void> {
@@ -152,4 +180,11 @@ export async function subscriptionCheckout(params: {
 export async function billingPortal(customerId: string, returnUrl: string): Promise<string> {
   const s = await (await stripeClient()).billingPortal.sessions.create({ customer: customerId, return_url: returnUrl });
   return s.url;
+}
+
+/** Verifies a Stripe webhook signature. Throws if the payload wasn't sent by Stripe. */
+export async function verifyWebhook(rawBody: string, signature: string): Promise<Stripe.Event> {
+  const { webhookSecret } = await stripeKeys();
+  if (!webhookSecret) throw new Error("Stripe webhook secret not configured");
+  return (await stripeClient()).webhooks.constructEvent(rawBody, signature, webhookSecret);
 }

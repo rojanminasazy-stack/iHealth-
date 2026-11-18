@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "build": "node build.mjs",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "build:apps": "node build-apps.mjs"
   },
   "dependencies": {
     "@fontsource-variable/public-sans": "^5.3.0",

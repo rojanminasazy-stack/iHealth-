@@ -289,6 +289,7 @@ export class IHealtheStack extends Stack {
     route(POST, "/physician/online", authPhysician, "physician", "setOnline");
     route(GET, "/physician/requests", authPhysician, "physician", "openRequests");
     route(POST, "/physician/requests/{id}/accept", authPhysician, "physician", "accept");
+    route(POST, "/physician/requests/{id}/decline", authPhysician, "physician", "decline");
     route(POST, "/physician/subscription", authPhysician, "physician", "subscription");
     route(GET, "/physician/visits", authPhysician, "visit", "physicianVisits");
     route(POST, "/physician/visits/{id}/join", authPhysician, "visit", "physicianJoin");

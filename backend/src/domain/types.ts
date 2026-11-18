@@ -50,6 +50,10 @@ export interface Provider {
   contact: { email?: string; phone?: string };
   createdAt: string;
   updatedAt: string;
+  /** Last time the physician's app checked in while online. Stale = treated as offline. */
+  lastSeenAt?: string;
+  /** The visit this physician is in right now; they get no new offers until it ends. */
+  busyWith?: string;
   /** Simple rolling stats for ranking. */
   rating?: number;
   avgResponseSeconds?: number;
@@ -76,8 +80,10 @@ export interface CareRequest {
   specialty: Specialty;
   chiefComplaint: string;
   symptomDuration: string;
-  /** The physician the patient chose. */
-  requestedProviderId: string;
+  /** A specific physician the patient chose. Empty means "first available" (Uber-style). */
+  requestedProviderId?: string;
+  /** Physicians who passed on this request; it isn't offered to them again. */
+  declinedBy?: string[];
   /** Present only while the request is paid-for and waiting for the physician; drives the openByState index. */
   openState?: StateCode;
   /** Where to send generic confirmations. Never included in notifications themselves. */
@@ -116,6 +122,7 @@ export type AuditAction =
   | "CARE_REQUEST_CANCELLED"
   | "CARE_REQUEST_ACCEPTED"
   | "CARE_REQUEST_ACCEPT_REJECTED"
+  | "CARE_REQUEST_DECLINED"
   | "VISIT_STARTED"
   | "VISIT_JOINED"
   | "VISIT_COMPLETED"

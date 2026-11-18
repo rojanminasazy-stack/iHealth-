@@ -32,8 +32,11 @@ export interface CreatedRequest {
   requestId: string;
   status: string;
   quote: Quote;
-  paymentClientSecret: string;
-  physician: Omit<PhysicianCard, "quote">;
+  /** Native apps: confirm with Stripe's payment sheet. */
+  paymentClientSecret?: string;
+  /** Website: send the patient to Stripe's hosted checkout. */
+  checkoutUrl?: string;
+  physician: Omit<PhysicianCard, "quote"> | null;
 }
 
 /** Chime SDK join payload, passed straight to the visit page. */
@@ -108,6 +111,9 @@ export interface OpenRequest {
   chiefComplaint: string;
   symptomDuration: string;
   youReceiveCents: number;
+  chosenYou: boolean;
+  visitMinutes: number;
+  secondsLeft: number;
   createdAt: string;
 }
 
@@ -138,7 +144,9 @@ export function createApi(baseUrl: string, auth: Auth) {
       physicians: (q: { state: string; specialty: string; ageGroup: string; language?: string }) =>
         call<{ physicians: PhysicianCard[] }>("GET", `/patient/physicians?${new URLSearchParams(q as Record<string, string>)}`),
       createRequest: (b: {
-        providerId: string;
+        /** Leave out for "first available". */
+        providerId?: string;
+        client?: "web" | "app";
         patientState: string;
         ageGroup: string;
         specialty: string;
@@ -166,7 +174,8 @@ export function createApi(baseUrl: string, auth: Auth) {
       signBaa: (version: string) => call<PhysicianSelf>("POST", "/physician/baa", { accept: true, version }),
       payoutsLink: () => call<{ url: string }>("POST", "/physician/payouts"),
       setOnline: (online: boolean) => call<{ online: boolean }>("POST", "/physician/online", { online }),
-      openRequests: () => call<{ requests: OpenRequest[] }>("GET", "/physician/requests"),
+      openRequests: () => call<{ requests: OpenRequest[]; busy: boolean }>("GET", "/physician/requests"),
+      decline: (id: string) => call<{ requestId: string; declined: boolean }>("POST", `/physician/requests/${encodeURIComponent(id)}/decline`),
       subscription: () => call<{ url: string }>("POST", "/physician/subscription"),
       visits: () => call<{ visits: PhysicianVisit[] }>("GET", "/physician/visits"),
       join: (id: string) => call<JoinInfo>("POST", `/physician/visits/${encodeURIComponent(id)}/join`),

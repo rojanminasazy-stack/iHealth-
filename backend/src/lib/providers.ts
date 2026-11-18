@@ -87,3 +87,20 @@ export function publicProfile(p: Provider) {
     verified: true,
   };
 }
+
+/** The physician's visit ended or was cancelled: they can receive new patients again. */
+export async function freeProvider(providerId: string, requestId: string): Promise<void> {
+  try {
+    await ddb.send(
+      new UpdateCommand({
+        TableName: tables.providers,
+        Key: { providerId },
+        UpdateExpression: "REMOVE busyWith SET updatedAt = :at",
+        ConditionExpression: "busyWith = :r",
+        ExpressionAttributeValues: { ":r": requestId, ":at": nowIso() },
+      }),
+    );
+  } catch (err) {
+    if ((err as { name?: string }).name !== "ConditionalCheckFailedException") throw err;
+  }
+}

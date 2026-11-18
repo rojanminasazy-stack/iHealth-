@@ -3,7 +3,7 @@ name: Deploy website
 on:
   push:
     branches: [main]
-    paths: ["website/**", ".github/workflows/website.yml"]
+    paths: ["website/**", "apps/**", ".github/workflows/website.yml"]
   workflow_dispatch:
 
 permissions:
@@ -23,10 +23,20 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Install website dependencies only
-        run: npm install -w website --no-audit --no-fund
-      - name: Build
+      - name: Install website and app dependencies
+        run: npm install -w website -w apps/shared -w apps/patient -w apps/physician --no-audit --no-fund
+      - name: Build website
         run: npm run build -w website
+      - name: Build the patient and physician web apps
+        run: npm run build:apps -w website
+        env:
+          # Public identifiers, set in GitHub → Settings → Secrets and variables → Actions → Variables.
+          EXPO_PUBLIC_API_URL: ${{ vars.EXPO_PUBLIC_API_URL }}
+          EXPO_PUBLIC_PATIENT_POOL_ID: ${{ vars.EXPO_PUBLIC_PATIENT_POOL_ID }}
+          EXPO_PUBLIC_PATIENT_CLIENT_ID: ${{ vars.EXPO_PUBLIC_PATIENT_CLIENT_ID }}
+          EXPO_PUBLIC_PHYSICIAN_POOL_ID: ${{ vars.EXPO_PUBLIC_PHYSICIAN_POOL_ID }}
+          EXPO_PUBLIC_PHYSICIAN_CLIENT_ID: ${{ vars.EXPO_PUBLIC_PHYSICIAN_CLIENT_ID }}
+          EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${{ vars.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: website/dist

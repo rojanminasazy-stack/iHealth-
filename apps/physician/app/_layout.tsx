@@ -1,16 +1,20 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, View } from "react-native";
-import { Stack } from "expo-router";
+import { router, Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { AuthFlow, color } from "@ihealthe/shared";
+import { AuthFlow, backendConfigured, color, OpeningSoon, useWebDeepLink } from "@ihealthe/shared";
 import { auth } from "../lib/session";
 
 export default function RootLayout() {
   const [state, setState] = useState<"loading" | "out" | "in">("loading");
+  useWebDeepLink(useCallback((path: string) => router.replace(path as never), []));
 
   useEffect(() => {
+    if (!backendConfigured()) return;
     auth.isSignedIn().then((ok) => setState(ok ? "in" : "out"));
   }, []);
+
+  if (!backendConfigured()) return <OpeningSoon appName="iHealthé Pro" waitlistUrl="https://ihealthe.net/apply.html" />;
 
   if (state === "loading")
     return (
@@ -24,7 +28,7 @@ export default function RootLayout() {
       <AuthFlow
         auth={auth}
         appName="iHealthé Pro"
-        tagline="See patients on your schedule. Set your own price. Get paid directly."
+        tagline="Go online when you're free. Get matched with patients in your state. Get paid directly."
         mfaNote="Physician accounts always use two-step sign-in. We'll text a code to your mobile number each time you sign in."
         onSignedIn={() => setState("in")}
       />

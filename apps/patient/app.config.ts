@@ -39,7 +39,9 @@ const config: ExpoConfig = {
     ["expo-splash-screen", { image: "./assets/splash-icon.png", backgroundColor: "#1B2D52", imageWidth: 180 }],
     ["@stripe/stripe-react-native", { merchantIdentifier: "merchant.net.ihealthe", enableGooglePay: true }],
   ],
-  experiments: { typedRoutes: true },
+  // Website version, served from ihealthe.net/app
+  web: { bundler: "metro", output: "single", favicon: "./assets/favicon.png" },
+  experiments: { typedRoutes: true, baseUrl: "/app" },
 };
 
 export default config;

@@ -35,7 +35,9 @@ const config: ExpoConfig = {
     "expo-secure-store",
     ["expo-splash-screen", { image: "./assets/splash-icon.png", backgroundColor: "#1B2D52", imageWidth: 180 }],
   ],
-  experiments: { typedRoutes: true },
+  // Website version, served from ihealthe.net/providervider
+  web: { bundler: "metro", output: "single", favicon: "./assets/favicon.png" },
+  experiments: { typedRoutes: true, baseUrl: "/provider" },
 };
 
 export default config;

@@ -1,10 +1,11 @@
 import { GetCommand, QueryCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from "aws-lambda";
 import { verifyWebhook } from "../lib/payments.js";
-import { ddb, nowIso, tables } from "../lib/db.js";
+import { ddb, nowIso, tables, todayIso } from "../lib/db.js";
 import { audit } from "../lib/audit.js";
 import { notify } from "../lib/notify.js";
-import { getProvider, tryActivate } from "../lib/providers.js";
+import { getProvider, providersByStatus, tryActivate } from "../lib/providers.js";
+import { canOffer } from "../domain/dispatch.js";
 import type { CareRequest, Provider } from "../domain/types.js";
 
 /**
@@ -61,10 +62,11 @@ export const main = async (e: APIGatewayProxyEventV2): Promise<APIGatewayProxyRe
             new UpdateCommand({
               TableName: tables.requests,
               Key: { requestId },
-              UpdateExpression: "SET #s = :o, openState = :st, updatedAt = :at",
+              // Web checkout creates the payment after the request, so record its id here.
+              UpdateExpression: "SET #s = :o, openState = :st, paymentIntentId = :pi, updatedAt = :at",
               ConditionExpression: "#s = :r",
               ExpressionAttributeNames: { "#s": "status" },
-              ExpressionAttributeValues: { ":o": "OFFERED", ":r": "REQUESTED", ":st": req.patientState, ":at": nowIso() },
+              ExpressionAttributeValues: { ":o": "OFFERED", ":r": "REQUESTED", ":st": req.patientState, ":pi": evt.data.object.id, ":at": nowIso() },
             }),
           );
         } catch (err) {
@@ -73,8 +75,12 @@ export const main = async (e: APIGatewayProxyEventV2): Promise<APIGatewayProxyRe
         }
         await audit({ actorId: "stripe", actorRole: "SYSTEM", action: "PAYMENT_AUTHORIZED", resourceType: "CARE_REQUEST", resourceId: requestId, result: "ALLOWED" });
         await notify(req.patientContact, "REQUEST_RECEIVED");
-        const p = await getProvider(req.requestedProviderId);
-        if (p) await notify(p.contact, "PROVIDER_NEW_REQUEST");
+        // Ping the chosen physician, or (first available) every available physician who may take it.
+        const now = Date.now();
+        const targets = req.requestedProviderId
+          ? [await getProvider(req.requestedProviderId)].filter((x): x is Provider => !!x)
+          : (await providersByStatus("ACTIVE")).filter((p) => canOffer(p, { ...req, status: "OFFERED" }, todayIso(), now)).slice(0, 25);
+        await Promise.all(targets.map((p) => notify(p.contact, "PROVIDER_NEW_REQUEST")));
       }
     }
   }

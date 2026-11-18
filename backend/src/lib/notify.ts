@@ -14,6 +14,10 @@ export const TEMPLATES = {
     subject: "We got your iHealthé request",
     text: "Your iHealthé request is in. We'll let you know as soon as a physician accepts.",
   },
+  REQUEST_EXPIRED: {
+    subject: "We couldn't find a physician just now",
+    text: "Sorry, no iHealthé physician was free in time. Your card hold was released and you weren't charged. Please try again soon.",
+  },
   VISIT_CONFIRMED: {
     subject: "Your iHealthé visit is confirmed",
     text: "Your iHealthé visit is confirmed. Open the app to join when you're ready.",

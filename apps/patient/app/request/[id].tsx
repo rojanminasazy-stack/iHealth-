@@ -72,10 +72,15 @@ export default function RequestScreen() {
     <Screen>
       {waiting ? (
         <>
-          <Label>Request sent</Label>
-          <Title>Waiting for your physician</Title>
+          <Label>{r.status === "REQUESTED" ? "Confirming your payment" : "Request sent"}</Label>
+          <Title>{r.physician ? `Waiting for ${r.physician.name.split(",")[0]}` : "Finding your doctor…"}</Title>
           <ActivityIndicator color={color.navy} size="large" />
-          <Body>We've let them know. You'll get a text and email as soon as they accept.</Body>
+          <Body>
+            {r.physician
+              ? "We've let them know. If they can't take you, we'll offer your visit to the next available doctor."
+              : "We're offering your visit to verified doctors licensed in your state. Most patients are matched within a few minutes."}
+          </Body>
+          <Small>You'll get a text and email the moment a doctor accepts. If nobody does within 10 minutes, the card hold is released.</Small>
           <Button title="Cancel request" variant="ghost" loading={busy} onPress={cancel} />
         </>
       ) : null}
@@ -120,7 +125,7 @@ export default function RequestScreen() {
 
       {["CANCELLED", "EXPIRED", "PROVIDER_CANCELLED"].includes(r.status) ? (
         <>
-          <Title>{r.status === "CANCELLED" ? "Request cancelled" : "This request ended"}</Title>
+          <Title>{r.status === "CANCELLED" ? "Request cancelled" : r.status === "EXPIRED" ? "No doctor was free just now" : "This request ended"}</Title>
           <Body>The hold on your card has been released. You weren't charged.</Body>
         </>
       ) : null}

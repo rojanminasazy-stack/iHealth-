@@ -70,3 +70,9 @@ The outputs include three lines starting with `GoDaddyDkim`. For each one:
 
 ## Never send in chat
 AWS passwords, MFA codes, the Stripe secret key, the webhook secret, or any patient information.
+
+## Part 9: Switch on the web apps (ihealthe.net/app and ihealthe.net/provider)
+The patient app runs at **ihealthe.net/app** and the physician app at **ihealthe.net/provider**. Until they're connected to the backend they show an "opening soon" screen.
+After Part 4, Claude adds these public values (from the deploy outputs) in GitHub → **Settings → Secrets and variables → Actions → Variables**:
+`EXPO_PUBLIC_API_URL`, `EXPO_PUBLIC_PATIENT_POOL_ID`, `EXPO_PUBLIC_PATIENT_CLIENT_ID`, `EXPO_PUBLIC_PHYSICIAN_POOL_ID`, `EXPO_PUBLIC_PHYSICIAN_CLIENT_ID`, `EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY`.
+Then re-run **Actions → Deploy website**.
