@@ -144,6 +144,9 @@ export function createApi(baseUrl: string, auth: Auth) {
   return {
     patient: {
       profile: () => call<{ profile: PatientProfileInput | null }>("GET", "/patient/profile"),
+      /** AI health questions. The conversation stays on the device; send the whole thread each time. */
+      ask: (messages: { role: "user" | "assistant"; content: string }[]) =>
+        call<{ answer: string; urgent: boolean }>("POST", "/patient/assistant", { messages }),
       saveProfile: (p: PatientProfileInput) => call<{ profile: PatientProfileInput }>("PUT", "/patient/profile", p),
       physicians: (q: { state: string; specialty: string; ageGroup: string; language?: string; onlyLanguage?: "1" }) =>
         call<{ physicians: PhysicianCard[] }>("GET", `/patient/physicians?${new URLSearchParams(q as Record<string, string>)}`),

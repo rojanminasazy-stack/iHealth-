@@ -191,6 +191,7 @@ export class IHealtheStack extends Stack {
       SMS_ORIGINATION: "",
       VIDEO_MEDIA_REGION: this.region, // set once a toll-free number is registered in AWS End User Messaging
       NODE_OPTIONS: "--enable-source-maps",
+      ASSISTANT_MODEL_ID: "us.anthropic.claude-haiku-4-5-20251001-v1:0",
     };
 
     const fns: lambda.Function[] = [];
@@ -201,7 +202,7 @@ export class IHealtheStack extends Stack {
         runtime: lambda.Runtime.NODEJS_22_X,
         architecture: lambda.Architecture.ARM_64,
         memorySize: 512,
-        timeout: Duration.seconds(15),
+        timeout: Duration.seconds(file === "assistant" ? 29 : 15),
         environment: env,
         environmentEncryption: key,
         bundling: {
@@ -234,6 +235,18 @@ export class IHealtheStack extends Stack {
           resources: ["*"],
         }),
       );
+      if (file === "assistant") {
+        // Claude on Bedrock. The "us." inference profile can route to any US region, so allow those.
+        f.addToRolePolicy(
+          new iam.PolicyStatement({
+            actions: ["bedrock:InvokeModel"],
+            resources: [
+              `arn:aws:bedrock:*:${this.account}:inference-profile/us.anthropic.*`,
+              "arn:aws:bedrock:us-*::foundation-model/anthropic.*",
+            ],
+          }),
+        );
+      }
       fns.push(f);
       return f;
     };
@@ -276,6 +289,7 @@ export class IHealtheStack extends Stack {
     route(GET, "/patient/profile", authPatient, "profile", "get");
     route(PUT, "/patient/profile", authPatient, "profile", "put");
     route(GET, "/patient/physicians", authPatient, "patient", "listPhysicians");
+    route(POST, "/patient/assistant", authPatient, "assistant", "ask");
     route(POST, "/patient/requests", authPatient, "patient", "createRequest");
     route(GET, "/patient/requests/{id}", authPatient, "patient", "getRequest");
     route(POST, "/patient/requests/{id}/join", authPatient, "visit", "patientJoin");

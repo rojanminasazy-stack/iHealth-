@@ -39,6 +39,15 @@ npx cdk deploy --require-approval never
 
 4. Wait until you see **Outputs:** followed by a list. Copy everything from **Outputs** down and send it to me. Those are public addresses, not passwords.
 
+## Part 4b: Switch on the AI assistant (3 minutes)
+The "Ask a health question" assistant uses Claude through **Amazon Bedrock**, inside your own AWS account.
+1. Search **Bedrock** → open **Amazon Bedrock** (Oregon).
+2. Left menu → **Model catalog** → open **Claude Haiku 4.5** (by Anthropic).
+3. If AWS asks for **use case details** the first time, fill it in. Company: `iHealthé LLC`. Website: `https://ihealthe.net`. Use case: *A patient-facing assistant in our telehealth app that answers simple, general health questions, labels every answer as AI, and refers patients to a licensed physician or 911.*
+4. Submit. Approval is usually instant.
+
+Bedrock is covered by the AWS BAA you accepted in Part 3.
+
 ## Part 5: Let AWS send email from ihealthe.net (GoDaddy, 5 minutes)
 The outputs include three lines starting with `GoDaddyDkim`. For each one:
 1. GoDaddy → **My Products** → ihealthe.net → **DNS** → **Add New Record**.
