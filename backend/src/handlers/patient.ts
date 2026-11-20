@@ -4,7 +4,7 @@ import { ddb, newId, nowIso, tables, todayIso } from "../lib/db.js";
 import { audit } from "../lib/audit.js";
 import { freeProvider, getProvider, providersByStatus, publicProfile } from "../lib/providers.js";
 import { authorizeVisit, checkoutVisit, releaseVisit } from "../lib/payments.js";
-import { isAvailableNow, offerExpired } from "../domain/dispatch.js";
+import { isAvailableNow, offerExpired, speaks } from "../domain/dispatch.js";
 import { notify } from "../lib/notify.js";
 import { findEligible, isEligible } from "../domain/eligibility.js";
 import { assertRequestTransition } from "../domain/stateMachines.js";
@@ -22,8 +22,9 @@ function claim(e: Event, name: string): string | undefined {
 }
 
 /**
- * GET /patient/physicians?state=CA&specialty=FAMILY_MEDICINE&ageGroup=ADULT&language=fa
+ * GET /patient/physicians?state=CA&specialty=FAMILY_MEDICINE&ageGroup=ADULT&language=fa&onlyLanguage=1
  * Lists physicians who may legally see this patient right now, best match first.
+ * With onlyLanguage=1, lists only physicians who speak that language.
  */
 export const listPhysicians = handler(async (e) => {
   const c = caller(e, "PATIENT");
@@ -35,7 +36,11 @@ export const listPhysicians = handler(async (e) => {
     today: todayIso(),
   };
   const now = Date.now();
-  const ranked = findEligible(await providersByStatus("ACTIVE"), query, { preferredLanguage: q.language }).filter((p) => isAvailableNow(p, now));
+  const language = q.language ? v.language(q.language) : undefined;
+  const onlyLanguage = q.onlyLanguage === "1" ? language : undefined;
+  const ranked = findEligible(await providersByStatus("ACTIVE"), query, { preferredLanguage: language }).filter(
+    (p) => isAvailableNow(p, now) && speaks(p, onlyLanguage),
+  );
   await audit({ actorId: c.userId, actorRole: "PATIENT", action: "PROVIDER_LIST_VIEWED", resourceType: "PROVIDER", resourceId: `list:${query.patientState}`, result: "ALLOWED" });
   return json(200, {
     physicians: ranked.slice(0, 50).map((p) => ({ ...publicProfile(p), quote: quote() })),
@@ -62,15 +67,26 @@ export const createRequest = handler(async (e) => {
   const eligibility = { patientState, ageGroup, specialty, today: todayIso() };
   const now = Date.now();
   // Uber-style: no physician chosen means "first available". A chosen physician must be available now.
+  // Language match: when set, only doctors who speak this language are offered the visit.
+  const language = b.language ? v.language(b.language) : undefined;
+  const languageLabel = language ? (LANGUAGE_NAMES[language] ?? language) : "";
   const chosenId = b.providerId === undefined || b.providerId === null || b.providerId === "" ? undefined : v.str(b.providerId, "Physician", 60);
   const provider = chosenId ? await getProvider(chosenId) : undefined;
   if (chosenId && (!provider || !isEligible(provider, eligibility) || !isAvailableNow(provider, now))) {
     throw new HttpError(409, "That physician just went offline. Tap See a doctor now and we'll find you someone else.");
   }
+  if (provider && !speaks(provider, language)) {
+    throw new HttpError(409, `That physician doesn't list ${languageLabel}. Choose another doctor or turn off the language match.`);
+  }
   if (!chosenId) {
-    const available = findEligible(await providersByStatus("ACTIVE"), eligibility).filter((p) => isAvailableNow(p, now));
+    const available = findEligible(await providersByStatus("ACTIVE"), eligibility).filter((p) => isAvailableNow(p, now) && speaks(p, language));
     if (available.length === 0) {
-      throw new HttpError(409, `No physicians licensed in ${patientState} are online right now. Please try again in a few minutes.`);
+      throw new HttpError(
+        409,
+        language
+          ? `No ${languageLabel}-speaking physicians licensed in ${patientState} are online right now. Try again soon, or turn off the language match to see any available doctor.`
+          : `No physicians licensed in ${patientState} are online right now. Please try again in a few minutes.`,
+      );
     }
   }
   const priced = quote();
@@ -84,6 +100,7 @@ export const createRequest = handler(async (e) => {
     chiefComplaint: v.str(b.chiefComplaint, "Reason for your visit", 500),
     symptomDuration: v.str(b.symptomDuration, "When it started", 40),
     requestedProviderId: provider?.providerId,
+    language,
     status: "REQUESTED",
     visitPriceCents: priced.visitPriceCents,
     bookingFeeCents: priced.bookingFeeCents,
@@ -176,3 +193,9 @@ async function expire(r: CareRequest): Promise<CareRequest> {
   await notify(r.patientContact, "REQUEST_EXPIRED");
   return { ...r, status: "EXPIRED" };
 }
+
+const LANGUAGE_NAMES: Record<string, string> = {
+  en: "English", es: "Spanish", zh: "Mandarin", yue: "Cantonese", tl: "Tagalog", vi: "Vietnamese", ko: "Korean",
+  hy: "Armenian", fa: "Farsi", ar: "Arabic", ru: "Russian", hi: "Hindi", pa: "Punjabi", ja: "Japanese",
+  fr: "French", pt: "Portuguese", ase: "American Sign Language",
+};

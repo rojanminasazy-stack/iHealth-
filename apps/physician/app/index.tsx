@@ -24,6 +24,7 @@ import {
   type OpenRequest,
   type PhysicianSelf,
   type PhysicianVisit,
+  languageName,
 } from "@ihealthe/shared";
 import { api } from "../lib/session";
 
@@ -352,6 +353,7 @@ function Active({ me, reload }: { me: PhysicianSelf; reload: () => Promise<void>
                 <Pill text={`Patient in ${v.patientState}`} />
               </Row>
               <Body>{`Reason: ${v.chiefComplaint}`}</Body>
+              {v.language ? <Small style={{ fontWeight: "700" }}>{`Patient asked for a visit in ${languageName(v.language)}`}</Small> : null}
               <Small>Started: {v.symptomDuration} · {specialtyName(v.specialty)} · {v.visitMinutes}-minute visit</Small>
               {v.patient ? (
                 <View style={{ gap: 4 }}>
@@ -394,6 +396,7 @@ function Active({ me, reload }: { me: PhysicianSelf; reload: () => Promise<void>
                 <Small style={{ fontWeight: "700", color: r.secondsLeft < 60 ? color.bad : color.ink }}>{`${Math.floor(r.secondsLeft / 60)}:${String(r.secondsLeft % 60).padStart(2, "0")} left`}</Small>
               </Row>
               <Heading>{r.chiefComplaint}</Heading>
+              {r.language ? <Pill tone="info" text={`VISIT IN ${languageName(r.language).toUpperCase()}`} /> : null}
               <Small>{`${r.ageGroup === "CHILD" ? "Child" : "Adult"} · Patient in ${r.patientState} · Started ${r.symptomDuration}`}</Small>
               <Small>{`${specialtyName(r.specialty)} · ${r.visitMinutes}-minute video visit · You receive ${money(r.youReceiveCents)}`}</Small>
               <Row style={{ flexWrap: "nowrap" }}>

@@ -7,6 +7,7 @@ import {
   ErrorText,
   Field,
   Label,
+  LANGUAGES,
   Notice,
   Row,
   Screen,
@@ -19,13 +20,6 @@ import { api } from "../lib/session";
 const CREDENTIALS = [
   { code: "MD", name: "MD" },
   { code: "DO", name: "DO" },
-] as const;
-
-const LANGUAGES = [
-  { code: "en", name: "English" },
-  { code: "es", name: "Spanish" },
-  { code: "fa", name: "Farsi" },
-  { code: "zh", name: "Chinese" },
 ] as const;
 
 interface LicenseDraft {
@@ -51,6 +45,7 @@ export default function Apply() {
   const submit = async () => {
     setError(null);
     if (licenses.some((l) => !l.state)) return setError("Choose the state for each license.");
+    if (languages.length === 0) return setError("Choose at least one language you see patients in.");
     setBusy(true);
     try {
       await api.physician.apply({
@@ -100,9 +95,10 @@ export default function Apply() {
       <Chips
         options={LANGUAGES}
         value={undefined}
+        selected={languages}
         onChange={(code) => setLanguages((ls) => (ls.includes(code) ? ls.filter((x) => x !== code) : [...ls, code]))}
       />
-      <Small>Selected: {languages.join(", ") || "none"}</Small>
+      <Small>Pick every language you can hold a full visit in. Patients who ask for a language are matched only with doctors who speak it.</Small>
 
       <Row style={{ flexWrap: "nowrap" }}>
         <Switch value={peds} onValueChange={setPeds} accessibilityLabel="I see patients under 18" />

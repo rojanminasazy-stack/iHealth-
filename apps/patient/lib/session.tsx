@@ -18,6 +18,8 @@ export interface Intake {
   ageGroup: "ADULT" | "CHILD";
   specialty: string;
   language?: string;
+  /** Match only with doctors who speak `language`. */
+  languageMatch?: boolean;
 }
 
 const Ctx = createContext<{ intake: Intake | null; setIntake: (i: Intake | null) => void }>({

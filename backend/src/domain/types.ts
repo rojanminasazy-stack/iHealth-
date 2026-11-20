@@ -82,6 +82,8 @@ export interface CareRequest {
   symptomDuration: string;
   /** A specific physician the patient chose. Empty means "first available" (Uber-style). */
   requestedProviderId?: string;
+  /** When set, the patient asked for a doctor who speaks this language. Only those doctors are offered the visit. */
+  language?: string;
   /** Physicians who passed on this request; it isn't offered to them again. */
   declinedBy?: string[];
   /** Present only while the request is paid-for and waiting for the physician; drives the openByState index. */
@@ -162,6 +164,8 @@ export interface PatientProfile {
   medications: string;
   chronicConditions: string;
   allergies: string;
+  /** Language the patient prefers for visits. Defaults to English. */
+  preferredLanguage?: string;
   createdAt: string;
   updatedAt: string;
 }

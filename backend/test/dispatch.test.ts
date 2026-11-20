@@ -63,3 +63,18 @@ describe("Uber-style dispatch", () => {
     expect(canOffer(doc(), req({ status: "MATCHED" }), TODAY, NOW)).toBe(false);
   });
 });
+
+describe("Language match", () => {
+  it("offers a language-matched request only to physicians who speak that language", () => {
+    expect(canOffer(doc({ languages: ["en", "fa"] }), req({ language: "fa" }), TODAY, NOW)).toBe(true);
+    expect(canOffer(doc({ languages: ["en", "es"] }), req({ language: "fa" }), TODAY, NOW)).toBe(false);
+  });
+
+  it("offers to everyone when the patient didn't ask for a language", () => {
+    expect(canOffer(doc({ languages: ["es"] }), req(), TODAY, NOW)).toBe(true);
+  });
+
+  it("still never crosses state lines for a language match", () => {
+    expect(canOffer(doc({ languages: ["hy"] }), req({ language: "hy", patientState: "NY" }), TODAY, NOW)).toBe(false);
+  });
+});

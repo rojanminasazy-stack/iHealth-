@@ -28,6 +28,31 @@ export const type = {
 
 export const money = (cents: number) => `$${(cents / 100).toFixed(cents % 100 === 0 ? 0 : 2)}`;
 
+/** Languages patients can ask for and physicians can offer. Keep in sync with backend/src/domain/validation.ts. */
+export const LANGUAGES = [
+  { code: "en", name: "English" },
+  { code: "es", name: "Spanish" },
+  { code: "zh", name: "Mandarin" },
+  { code: "yue", name: "Cantonese" },
+  { code: "tl", name: "Tagalog" },
+  { code: "vi", name: "Vietnamese" },
+  { code: "ko", name: "Korean" },
+  { code: "hy", name: "Armenian" },
+  { code: "fa", name: "Farsi" },
+  { code: "ar", name: "Arabic" },
+  { code: "ru", name: "Russian" },
+  { code: "hi", name: "Hindi" },
+  { code: "pa", name: "Punjabi" },
+  { code: "ja", name: "Japanese" },
+  { code: "fr", name: "French" },
+  { code: "pt", name: "Portuguese" },
+  { code: "ase", name: "American Sign Language" },
+] as const;
+
+export function languageName(code: string | undefined): string {
+  return LANGUAGES.find((l) => l.code === code)?.name ?? code ?? "English";
+}
+
 export const STATES = [
   { code: "CA", name: "California" },
   { code: "TX", name: "Texas" },

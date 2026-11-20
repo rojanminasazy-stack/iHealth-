@@ -31,8 +31,14 @@ export function canOffer(p: Provider, r: CareRequest, today: string, nowMs: numb
   if (offerExpired(r, nowMs)) return false;
   if (r.requestedProviderId && r.requestedProviderId !== p.providerId) return false;
   if (r.declinedBy?.includes(p.providerId)) return false;
+  if (!speaks(p, r.language)) return false;
   if (!isAvailableNow(p, nowMs)) return false;
   return isEligible(p, { patientState: r.patientState, ageGroup: r.ageGroup, specialty: r.specialty, today });
+}
+
+/** True when no language was asked for, or the physician speaks the one the patient asked for. */
+export function speaks(p: Pick<Provider, "languages">, language: string | undefined): boolean {
+  return !language || p.languages.includes(language);
 }
 
 export function secondsLeft(r: Pick<CareRequest, "createdAt">, nowMs: number): number {

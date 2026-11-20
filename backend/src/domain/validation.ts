@@ -29,6 +29,14 @@ export function specialty(v: unknown): Specialty {
   throw new ValidationError("Specialty is not supported.");
 }
 
+/** Keep in sync with LANGUAGES in apps/shared/src/theme.ts. */
+export const LANGUAGE_CODES = ["en", "es", "zh", "yue", "tl", "vi", "ko", "hy", "fa", "ar", "ru", "hi", "pa", "ja", "fr", "pt", "ase"] as const;
+
+export function language(v: unknown, field = "Language"): string {
+  if (typeof v === "string" && (LANGUAGE_CODES as readonly string[]).includes(v)) return v;
+  throw new ValidationError(`${field} is not one we support yet.`);
+}
+
 export function ageGroup(v: unknown): AgeGroup {
   if (v === "ADULT" || v === "CHILD") return v;
   throw new ValidationError("Age group must be ADULT or CHILD.");

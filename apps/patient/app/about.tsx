@@ -8,6 +8,7 @@ import {
   ErrorText,
   Field,
   Label,
+  LANGUAGES,
   Notice,
   Screen,
   Small,
@@ -49,6 +50,7 @@ export default function About() {
   const [meds, setMeds] = useState("");
   const [chronic, setChronic] = useState("");
   const [allergies, setAllergies] = useState("");
+  const [language, setLanguage] = useState<string>("en");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -70,6 +72,7 @@ export default function About() {
         setMeds(p.medications);
         setChronic(p.chronicConditions);
         setAllergies(p.allergies);
+        setLanguage(p.preferredLanguage ?? "en");
       })
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false));
@@ -89,6 +92,7 @@ export default function About() {
       medications: meds,
       chronicConditions: chronic,
       allergies,
+      preferredLanguage: language,
     };
     setBusy(true);
     try {
@@ -129,6 +133,10 @@ export default function About() {
 
       <Label>State of residence</Label>
       <Chips options={STATES} value={residence} onChange={setResidence} />
+
+      <Label>Preferred language for visits</Label>
+      <Chips options={LANGUAGES} value={language as (typeof LANGUAGES)[number]["code"]} onChange={setLanguage} />
+      <Small>We'll offer to match you with a doctor who speaks it. You can change this before each visit.</Small>
 
       <Label>Your health</Label>
       <Field label="Health history" placeholder="Past illnesses, surgeries, hospital stays. Write None if none." value={history} onChangeText={setHistory} multiline maxLength={2000} />

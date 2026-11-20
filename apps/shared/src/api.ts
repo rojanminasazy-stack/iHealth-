@@ -55,6 +55,7 @@ export interface PatientProfileInput {
   medications: string;
   chronicConditions: string;
   allergies: string;
+  preferredLanguage?: string;
 }
 
 export interface PatientForPhysician extends PatientProfileInput {
@@ -69,6 +70,7 @@ export interface PhysicianVisit {
   patientState: string;
   chiefComplaint: string;
   symptomDuration: string;
+  language: string | null;
   createdAt: string;
   visitMinutes: number;
   patient: PatientForPhysician | null;
@@ -112,6 +114,8 @@ export interface OpenRequest {
   symptomDuration: string;
   youReceiveCents: number;
   chosenYou: boolean;
+  /** The patient asked for a doctor who speaks this language. */
+  language: string | null;
   visitMinutes: number;
   secondsLeft: number;
   createdAt: string;
@@ -141,7 +145,7 @@ export function createApi(baseUrl: string, auth: Auth) {
     patient: {
       profile: () => call<{ profile: PatientProfileInput | null }>("GET", "/patient/profile"),
       saveProfile: (p: PatientProfileInput) => call<{ profile: PatientProfileInput }>("PUT", "/patient/profile", p),
-      physicians: (q: { state: string; specialty: string; ageGroup: string; language?: string }) =>
+      physicians: (q: { state: string; specialty: string; ageGroup: string; language?: string; onlyLanguage?: "1" }) =>
         call<{ physicians: PhysicianCard[] }>("GET", `/patient/physicians?${new URLSearchParams(q as Record<string, string>)}`),
       createRequest: (b: {
         /** Leave out for "first available". */
@@ -152,6 +156,8 @@ export function createApi(baseUrl: string, auth: Auth) {
         specialty: string;
         chiefComplaint: string;
         symptomDuration: string;
+        /** Match only with doctors who speak this language. */
+        language?: string;
         emergencyAcknowledged: true;
       }) => call<CreatedRequest>("POST", "/patient/requests", b),
       request: (id: string) => call<RequestStatus>("GET", `/patient/requests/${encodeURIComponent(id)}`),

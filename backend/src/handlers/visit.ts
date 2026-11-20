@@ -130,6 +130,7 @@ export const physicianVisits = handler(async (e) => {
     patientState: x.patientState,
     chiefComplaint: x.chiefComplaint,
     symptomDuration: x.symptomDuration,
+    language: x.language ?? null,
     createdAt: x.createdAt,
     visitMinutes: FEES.visitMinutes,
     patient: patientForPhysician(profiles.get(x.patientUserId)),

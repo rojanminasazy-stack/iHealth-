@@ -86,20 +86,23 @@ export function Chips<T extends string>({
   options,
   value,
   onChange,
+  selected,
 }: {
   options: readonly { code: T; name: string }[];
   value: T | undefined;
   onChange: (v: T) => void;
+  /** For multi-select lists: every code that should show as picked. */
+  selected?: readonly string[];
 }) {
   return (
     <View style={s.chips}>
       {options.map((o) => {
-        const on = o.code === value;
+        const on = o.code === value || (selected?.includes(o.code) ?? false);
         return (
           <Pressable
             key={o.code}
-            accessibilityRole="radio"
-            accessibilityState={{ selected: on }}
+            accessibilityRole={selected ? "checkbox" : "radio"}
+            accessibilityState={selected ? { checked: on } : { selected: on }}
             onPress={() => onChange(o.code)}
             style={[s.chip, on && s.chipOn]}
           >

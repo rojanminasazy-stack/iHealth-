@@ -9,6 +9,7 @@ import {
   ErrorText,
   Heading,
   Label,
+  languageName,
   money,
   Notice,
   Pill,
@@ -21,20 +22,21 @@ import {
 import { api, useIntake } from "../lib/session";
 import { CLIENT, usePay } from "../lib/pay";
 
-const LANG: Record<string, string> = { en: "English", es: "Spanish", fa: "Farsi", zh: "Chinese" };
-
 /**
  * Uber-style: the default is "match me with the first available doctor".
  * Patients can still pick a specific doctor who's online right now.
  */
 export default function Choose() {
-  const { intake } = useIntake();
+  const { intake, setIntake } = useIntake();
   const pay = usePay();
   const [list, setList] = useState<PhysicianCard[] | null>(null);
   const [picked, setPicked] = useState<PhysicianCard | null>(null);
   const [notEmergency, setNotEmergency] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const match = Boolean(intake?.languageMatch && intake.language);
+  const langName = languageName(intake?.language);
 
   const load = useCallback(async () => {
     if (!intake) return;
@@ -45,6 +47,7 @@ export default function Choose() {
         specialty: intake.specialty,
         ageGroup: intake.ageGroup,
         language: intake.language ?? "en",
+        ...(match ? { onlyLanguage: "1" as const } : {}),
       });
       setList(r.physicians);
       setPicked((p) => (p && r.physicians.some((x) => x.providerId === p.providerId) ? p : null));
@@ -52,7 +55,7 @@ export default function Choose() {
       setError((e as Error).message);
       setList([]);
     }
-  }, [intake]);
+  }, [intake, match]);
 
   // Like a ride app's map: refresh who's online every 15 seconds.
   useEffect(() => {
@@ -81,6 +84,7 @@ export default function Choose() {
         specialty: intake.specialty,
         chiefComplaint: intake.chiefComplaint,
         symptomDuration: intake.symptomDuration,
+        language: match ? intake.language : undefined,
         emergencyAcknowledged: true,
       });
       const result = await pay(created);
@@ -107,7 +111,9 @@ export default function Choose() {
           ) : (
             <Heading>
               <Body style={{ color: color.white, fontSize: 22, fontWeight: "700" }}>
-                {online === 0 ? `No doctors online in ${intake.patientState} right now` : `${online} doctor${online === 1 ? "" : "s"} online in ${intake.patientState}`}
+                {online === 0
+                  ? `No ${match ? `${langName}-speaking ` : ""}doctors online in ${intake.patientState} right now`
+                  : `${online} ${match ? `${langName}-speaking ` : ""}doctor${online === 1 ? "" : "s"} online in ${intake.patientState}`}
               </Body>
             </Heading>
           )}
@@ -120,7 +126,11 @@ export default function Choose() {
               <Heading>First available doctor</Heading>
               <Pill tone="good" text="FASTEST" />
             </Row>
-            <Small>We'll connect you with the first verified doctor licensed in your state who accepts.</Small>
+            <Small>
+              {match
+                ? `We'll connect you with the first verified doctor licensed in your state who speaks ${langName} and accepts.`
+                : "We'll connect you with the first verified doctor licensed in your state who accepts."}
+            </Small>
           </Card>
         </Pressable>
 
@@ -138,12 +148,18 @@ export default function Choose() {
                   <Pill tone="good" text="LICENSE VERIFIED" />
                   <Pill text={specialtyName(p.specialty)} />
                 </Row>
-                <Small>Speaks {p.languages.map((l) => LANG[l] ?? l).join(", ")}</Small>
+                <Small>Speaks {p.languages.map((l) => languageName(l)).join(", ")}</Small>
               </Card>
             </Pressable>
           );
         })}
-        {online === 0 && list !== null ? <Notice>Doctors come online throughout the day. Pull down to refresh, or try again in a few minutes.</Notice> : null}
+        {online === 0 && list !== null && match ? (
+          <Card>
+            <Small>{`Doctors who speak ${langName} aren't online right now. You can wait and pull down to refresh, or see any available doctor now.`}</Small>
+            <Button title="See any available doctor" variant="ghost" onPress={() => setIntake({ ...intake, languageMatch: false })} />
+          </Card>
+        ) : null}
+        {online === 0 && list !== null && !match ? <Notice>Doctors come online throughout the day. Pull down to refresh, or try again in a few minutes.</Notice> : null}
       </ScrollView>
 
       <View style={{ padding: space.lg, gap: space.md, backgroundColor: color.surface, borderTopWidth: 1, borderColor: color.line }}>

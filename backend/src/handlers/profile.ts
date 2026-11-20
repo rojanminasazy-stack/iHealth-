@@ -40,6 +40,7 @@ export const put = handler(async (e) => {
     medications: v.text(b.medications, "Current medications"),
     chronicConditions: v.text(b.chronicConditions, "Chronic conditions"),
     allergies: v.text(b.allergies, "Allergies", 1000),
+    preferredLanguage: b.preferredLanguage ? v.language(b.preferredLanguage, "Preferred language") : "en",
     createdAt: existing?.createdAt ?? at,
     updatedAt: at,
   };
