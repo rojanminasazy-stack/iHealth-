@@ -44,6 +44,15 @@ export class IHealtheStack extends Stack {
       description: "Encrypts iHealthé PHI at rest",
       removalPolicy: RemovalPolicy.RETAIN,
     });
+    // CloudWatch Logs encrypts our log groups with this key, so it must be allowed to use it (for this account's logs only).
+    key.addToResourcePolicy(
+      new iam.PolicyStatement({
+        principals: [new iam.ServicePrincipal(`logs.${this.region}.amazonaws.com`)],
+        actions: ["kms:Encrypt*", "kms:Decrypt*", "kms:ReEncrypt*", "kms:GenerateDataKey*", "kms:Describe*"],
+        resources: ["*"],
+        conditions: { ArnLike: { "kms:EncryptionContext:aws:logs:arn": `arn:aws:logs:${this.region}:${this.account}:log-group:*` } },
+      }),
+    );
 
     // ── Data ──
     const tableDefaults = {
