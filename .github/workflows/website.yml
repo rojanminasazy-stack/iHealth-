@@ -31,11 +31,11 @@ jobs:
         run: npm run build:apps -w website
         env:
           # Public identifiers, set in GitHub → Settings → Secrets and variables → Actions → Variables.
-          EXPO_PUBLIC_API_URL: ${{ vars.EXPO_PUBLIC_API_URL }}
-          EXPO_PUBLIC_PATIENT_POOL_ID: ${{ vars.EXPO_PUBLIC_PATIENT_POOL_ID }}
-          EXPO_PUBLIC_PATIENT_CLIENT_ID: ${{ vars.EXPO_PUBLIC_PATIENT_CLIENT_ID }}
-          EXPO_PUBLIC_PHYSICIAN_POOL_ID: ${{ vars.EXPO_PUBLIC_PHYSICIAN_POOL_ID }}
-          EXPO_PUBLIC_PHYSICIAN_CLIENT_ID: ${{ vars.EXPO_PUBLIC_PHYSICIAN_CLIENT_ID }}
+          EXPO_PUBLIC_API_URL: ${{ vars.EXPO_PUBLIC_API_URL || 'https://kjl77ryu5f.execute-api.us-west-2.amazonaws.com' }}
+          EXPO_PUBLIC_PATIENT_POOL_ID: ${{ vars.EXPO_PUBLIC_PATIENT_POOL_ID || 'us-west-2_ZeTtVtNfs' }}
+          EXPO_PUBLIC_PATIENT_CLIENT_ID: ${{ vars.EXPO_PUBLIC_PATIENT_CLIENT_ID || '2dg8avibhdu8l8lhc70jmt4r53' }}
+          EXPO_PUBLIC_PHYSICIAN_POOL_ID: ${{ vars.EXPO_PUBLIC_PHYSICIAN_POOL_ID || 'us-west-2_78D3sj0RE' }}
+          EXPO_PUBLIC_PHYSICIAN_CLIENT_ID: ${{ vars.EXPO_PUBLIC_PHYSICIAN_CLIENT_ID || '2d80c3h3delvluv67bqupulun3' }}
           EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${{ vars.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY }}
       - uses: actions/upload-pages-artifact@v3
         with:

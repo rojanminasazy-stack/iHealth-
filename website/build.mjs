@@ -2,7 +2,7 @@ import { build } from "esbuild";
 import { cp, mkdir, rm, readdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-/** Builds the static site into dist/. config.json is written at deploy time by CDK. */
+/** Builds the static site into dist/. src/pages/config.json holds the public backend IDs for the staff page. */
 await rm("dist", { recursive: true, force: true });
 await mkdir("dist", { recursive: true });
 await cp("src/pages", "dist", { recursive: true });
