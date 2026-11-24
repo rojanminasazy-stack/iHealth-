@@ -78,9 +78,9 @@ export default function RequestScreen() {
           <Body>
             {r.physician
               ? "We've let them know. If they can't take you, we'll offer your visit to the next available doctor."
-              : "We're offering your visit to verified doctors licensed in your state. Most patients are matched within a few minutes."}
+              : "We're offering your visit to verified doctors licensed in your state. Most patients are connected in under 15 minutes."}
           </Body>
-          <Small>You'll get a text and email the moment a doctor accepts. If nobody does within 10 minutes, the card hold is released.</Small>
+          <Small>You'll get a text and email the moment a doctor accepts. If nobody does within 15 minutes, the card hold is released.</Small>
           <Button title="Cancel request" variant="ghost" loading={busy} onPress={cancel} />
         </>
       ) : null}

@@ -55,7 +55,7 @@ describe("Uber-style dispatch", () => {
     const old = req({ createdAt: new Date(NOW - DISPATCH.offerWindowMs - 1).toISOString() });
     expect(offerExpired(old, NOW)).toBe(true);
     expect(canOffer(doc(), old, TODAY, NOW)).toBe(false);
-    expect(secondsLeft(req(), NOW)).toBe(540);
+    expect(secondsLeft(req(), NOW)).toBe(840); // created 1 minute ago, 15-minute window
   });
 
   it("only offers paid-for open requests", () => {

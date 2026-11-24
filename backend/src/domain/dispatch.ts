@@ -12,7 +12,7 @@ export const DISPATCH = {
   /** The physician app checks in every 5 seconds while online. */
   heartbeatStaleAfterMs: 90_000,
   /** How long patients wait for a physician before we stop searching. */
-  offerWindowMs: 10 * 60_000,
+  offerWindowMs: 15 * 60_000,
 } as const;
 
 export function isAvailableNow(p: Provider, nowMs: number): boolean {

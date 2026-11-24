@@ -29,7 +29,7 @@ export default function RootLayout() {
       <AuthFlow
         auth={auth}
         appName="iHealthé"
-        tagline="See a licensed physician from your phone, usually within minutes."
+        tagline="See a licensed physician from your phone, usually in under 15 minutes."
         onSignedIn={() => setState("in")}
       />
     );

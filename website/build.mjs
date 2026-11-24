@@ -85,13 +85,59 @@ const fill = (html) =>
     .replace("{{BODY_WAITLIST}}", BODIES.WAITLIST)
     .replace("{{BODY_APPLY}}", BODIES.APPLY);
 
+/**
+ * Search and social-share tags per page. Private pages (visits, staff, Stripe returns, 404)
+ * get noindex so search engines skip them.
+ */
+const SITE = "https://ihealthe.net";
+const SEO = {
+  "/": {
+    title: "iHealthé: See a licensed physician from your phone",
+    description: "Private 20-minute video visits with a verified physician licensed in your state. $79 per visit. Ask for a doctor who speaks your language.",
+  },
+  "/physicians.html": {
+    title: "iHealthé for Physicians: See patients on your schedule",
+    description: "Go online when you're free and see patients in the states where you're licensed. Get paid directly. Founding physicians get 90 days free.",
+  },
+  "/apply.html": { title: "Apply to see patients on iHealthé", description: "Apply to join iHealthé as a physician. Have your NPI, state license numbers and CV ready. It takes about five minutes." },
+  "/waitlist.html": { title: "Get early access to iHealthé", description: "Join the waitlist and we'll email you the day iHealthé opens in your state. We only ask for your name, email and state." },
+  "/privacy.html": { title: "Privacy Policy | iHealthé", description: "What iHealthé collects, how it's protected, who it's shared with, and how to delete your account." },
+  "/privacy-notice.html": { title: "Notice of Privacy Practices | iHealthé", description: "How your health information may be used and shared, and your rights to see and correct it." },
+  "/terms.html": { title: "Terms of Service | iHealthé", description: "The terms for using iHealthé video visits, the AI assistant and the iHealthé apps." },
+};
+const seoTags = (path) => {
+  const s = SEO[path];
+  if (!s) return `<meta name="robots" content="noindex, nofollow">`;
+  const url = SITE + path;
+  const esc = (t) => t.replaceAll("&", "&amp;").replaceAll('"', "&quot;");
+  return [
+    `<meta name="description" content="${esc(s.description)}">`,
+    `<link rel="canonical" href="${url}">`,
+    `<meta property="og:type" content="website">`,
+    `<meta property="og:site_name" content="iHealthé">`,
+    `<meta property="og:url" content="${url}">`,
+    `<meta property="og:title" content="${esc(s.title)}">`,
+    `<meta property="og:description" content="${esc(s.description)}">`,
+    `<meta property="og:image" content="${SITE}/og-image.png">`,
+    `<meta property="og:image:width" content="1200">`,
+    `<meta property="og:image:height" content="630">`,
+    `<meta property="og:image:alt" content="iHealthé: see a licensed physician by video">`,
+    `<meta name="twitter:card" content="summary_large_image">`,
+    `<meta name="theme-color" content="#14254a">`,
+  ].join("\n");
+};
+const ICONS = `<link rel="icon" href="/favicon.ico" sizes="32x32">\n<link rel="apple-touch-icon" href="/apple-touch-icon.png">\n<link rel="manifest" href="/site.webmanifest">`;
+
 async function walk(dir) {
   for (const e of await readdir(dir, { withFileTypes: true })) {
     const f = join(dir, e.name);
     if (e.isDirectory()) await walk(f);
     else if (f.endsWith(".html")) {
       let html = fill(await readFile(f, "utf8"));
-      if (!html.includes("Content-Security-Policy")) html = html.replace('<meta charset="utf-8">', `<meta charset="utf-8">\n${HEAD}`);
+      const rel = "/" + f.slice("dist/".length).replaceAll("\\", "/");
+      const path = rel === "/index.html" ? "/" : rel;
+      if (!html.includes("Content-Security-Policy"))
+        html = html.replace('<meta charset="utf-8">', `<meta charset="utf-8">\n${HEAD}\n${ICONS}\n${seoTags(path)}`);
       await writeFile(f, html);
     }
   }
