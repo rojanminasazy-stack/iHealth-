@@ -244,6 +244,10 @@ export class IHealtheStack extends Stack {
           resources: ["*"],
         }),
       );
+      if (file === "account") {
+        f.addEnvironment("PATIENT_POOL_ID", patients.pool.userPoolId);
+        f.addToRolePolicy(new iam.PolicyStatement({ actions: ["cognito-idp:AdminDeleteUser"], resources: [patients.pool.userPoolArn] }));
+      }
       if (file === "assistant") {
         // Claude on Bedrock. The "us." inference profile can route to any US region, so allow those.
         f.addToRolePolicy(
@@ -297,6 +301,9 @@ export class IHealtheStack extends Stack {
     // Patients
     route(GET, "/patient/profile", authPatient, "profile", "get");
     route(PUT, "/patient/profile", authPatient, "profile", "put");
+    route(GET, "/patient/consents", authPatient, "profile", "consentText");
+    route(POST, "/patient/consents", authPatient, "profile", "consent");
+    route(POST, "/patient/account/delete", authPatient, "account", "deleteAccount");
     route(GET, "/patient/physicians", authPatient, "patient", "listPhysicians");
     route(POST, "/patient/assistant", authPatient, "assistant", "ask");
     route(POST, "/patient/requests", authPatient, "patient", "createRequest");

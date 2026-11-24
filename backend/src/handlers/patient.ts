@@ -10,6 +10,7 @@ import { findEligible, isEligible } from "../domain/eligibility.js";
 import { assertRequestTransition } from "../domain/stateMachines.js";
 import { patientVisitView } from "./visit.js";
 import { getPatientProfile } from "./profile.js";
+import { missingConsents } from "../domain/consents.js";
 import { quote } from "../domain/fees.js";
 import * as v from "../domain/validation.js";
 import type { CareRequest } from "../domain/types.js";
@@ -61,6 +62,9 @@ export const createRequest = handler(async (e) => {
   }
   const profile = await getPatientProfile(c.userId);
   if (!profile) throw new HttpError(409, "Please finish the About you questions first.");
+  if (missingConsents(profile).length > 0) {
+    throw new HttpError(409, "Please review and accept the video care consent and privacy notice first.");
+  }
   const patientState = v.state(b.patientState, "Your current location");
   const ageGroup = "ADULT" as const; // accounts are 18+; derived from date of birth on the profile
   const specialty = v.specialty(b.specialty);

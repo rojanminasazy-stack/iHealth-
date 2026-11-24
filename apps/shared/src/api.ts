@@ -45,6 +45,8 @@ export interface JoinInfo {
   attendee: unknown;
 }
 
+export type ConsentKind = "telehealth" | "privacyNotice";
+
 export interface PatientProfileInput {
   fullName: string;
   dateOfBirth: string;
@@ -143,7 +145,11 @@ export function createApi(baseUrl: string, auth: Auth) {
 
   return {
     patient: {
-      profile: () => call<{ profile: PatientProfileInput | null }>("GET", "/patient/profile"),
+      profile: () => call<{ profile: PatientProfileInput | null; consentsNeeded: ConsentKind[] }>("GET", "/patient/profile"),
+      consentText: () => call<{ consents: Record<ConsentKind, { version: string; title: string; text: string }> }>("GET", "/patient/consents"),
+      acceptConsents: (accepted: { kind: ConsentKind; version: string }[]) =>
+        call<{ consentsNeeded: ConsentKind[] }>("POST", "/patient/consents", { accepted }),
+      deleteAccount: () => call<{ deleted: true }>("POST", "/patient/account/delete", {}),
       /** AI health questions. The conversation stays on the device; send the whole thread each time. */
       ask: (messages: { role: "user" | "assistant"; content: string }[]) =>
         call<{ answer: string; urgent: boolean }>("POST", "/patient/assistant", { messages }),

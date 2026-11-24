@@ -135,7 +135,9 @@ export type AuditAction =
   | "PROVIDER_LIST_VIEWED"
   | "AI_ASSISTANT_USED"
   | "INTAKE_VIEWED"
-  | "PATIENT_PROFILE_UPDATED";
+  | "PATIENT_PROFILE_UPDATED"
+  | "CONSENT_RECORDED"
+  | "PATIENT_ACCOUNT_DELETED";
 
 export type ActorRole = "PATIENT" | "PHYSICIAN" | "STAFF" | "SYSTEM";
 
@@ -167,6 +169,8 @@ export interface PatientProfile {
   allergies: string;
   /** Language the patient prefers for visits. Defaults to English. */
   preferredLanguage?: string;
+  /** Which version of each consent the patient agreed to, and when. */
+  consents?: Partial<Record<"telehealth" | "privacyNotice", { version: string; at: string }>>;
   createdAt: string;
   updatedAt: string;
 }

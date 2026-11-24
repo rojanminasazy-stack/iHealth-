@@ -49,6 +49,7 @@ export default function RootLayout() {
           <Stack.Screen name="index" options={{ title: "iHealthé" }} />
           <Stack.Screen name="about" options={{ title: "About you" }} />
           <Stack.Screen name="ask" options={{ title: "Ask a health question" }} />
+          <Stack.Screen name="consent" options={{ title: "Before your first visit" }} />
           <Stack.Screen name="intake" options={{ title: "What's going on?" }} />
           <Stack.Screen name="choose" options={{ title: "Find a doctor" }} />
           <Stack.Screen name="request/[id]" options={{ title: "Your visit", headerBackVisible: false }} />

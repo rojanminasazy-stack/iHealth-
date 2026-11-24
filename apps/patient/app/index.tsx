@@ -6,6 +6,7 @@ import { api } from "../lib/session";
 
 export default function Home() {
   const [hasProfile, setHasProfile] = useState<boolean | null>(null);
+  const [needsConsent, setNeedsConsent] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // New patients answer "About you" once before their first visit.
@@ -13,8 +14,9 @@ export default function Home() {
     useCallback(() => {
       api.patient
         .profile()
-        .then(({ profile }) => {
+        .then(({ profile, consentsNeeded }) => {
           setHasProfile(!!profile);
+          setNeedsConsent(consentsNeeded.length > 0);
           if (!profile) router.push("/about");
         })
         .catch((e: Error) => setError(e.message));
@@ -27,7 +29,7 @@ export default function Home() {
       <Title>What can we help you with?</Title>
       {hasProfile === null && !error ? <ActivityIndicator color={color.navy} /> : null}
       <ErrorText>{error}</ErrorText>
-      <Button big title="See a Physician Now" disabled={!hasProfile} onPress={() => router.push("/intake")} />
+      <Button big title="See a Physician Now" disabled={!hasProfile} onPress={() => router.push(needsConsent ? "/consent" : "/intake")} />
       <Pressable onPress={() => router.push("/ask")} accessibilityRole="button" accessibilityLabel="Ask the AI assistant a health question">
         <Card style={{ borderColor: color.accent, borderWidth: 2 }}>
           <Row style={{ justifyContent: "space-between" }}>
